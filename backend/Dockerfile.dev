@@ -1,0 +1,24 @@
+# backend/Dockerfile.dev — HouseMind
+# Development image with hot-reload via uvicorn --reload.
+# NOT used in production (Railway uses nixpacks.toml).
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps first (cached unless requirements change)
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Copy source (overridden by volume mount in docker-compose.yml)
+COPY . .
+
+EXPOSE 8000
+
+# Start command is overridden by docker-compose.yml
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

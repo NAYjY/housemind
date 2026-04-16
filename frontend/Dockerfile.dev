@@ -1,0 +1,18 @@
+# frontend/Dockerfile.dev — HouseMind
+# Development image with Next.js hot-reload.
+# NOT used in production (Vercel builds from source).
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install deps first (cached unless package.json changes)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy source (overridden by volume mount in docker-compose.yml)
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

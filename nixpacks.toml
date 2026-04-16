@@ -1,0 +1,20 @@
+# nixpacks.toml — HouseMind Railway deployment config
+#
+# Railway reads this file to build and deploy the FastAPI service.
+# The startCmd runs Alembic migrations BEFORE starting the app server.
+# If migrations fail, the deploy is aborted — the old instance keeps running.
+#
+# Required Railway env vars:
+#   DATABASE_URL   — injected automatically by Railway PostgreSQL plugin
+#   PORT           — injected automatically by Railway
+
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+# 1. alembic upgrade head  — applies all pending migrations atomically
+# 2. uvicorn               — starts the FastAPI server only after migrations succeed
+cmd = "cd backend && alembic -c ../db/alembic.ini upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT"

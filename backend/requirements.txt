@@ -1,0 +1,33 @@
+# backend/requirements.txt — HouseMind
+# Pinned for reproducible Railway deploys.
+# Update with: pip-compile requirements.in
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9      # form data
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.30
+asyncpg==0.29.0              # async PostgreSQL driver
+alembic==1.13.1
+psycopg2-binary==2.9.9       # sync driver for Alembic migrations
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+
+# ── Config ────────────────────────────────────────────────────────────────────
+pydantic==2.7.1
+pydantic-settings==2.3.0
+
+# ── AWS / S3 ─────────────────────────────────────────────────────────────────
+boto3==1.34.120
+botocore==1.34.120
+
+# ── Observability ─────────────────────────────────────────────────────────────
+sentry-sdk[fastapi]==2.3.1
+structlog==24.1.0
+
+# ── Email (magic link dispatch) ───────────────────────────────────────────────
+httpx==0.27.0                # used for Resend/SendGrid API calls

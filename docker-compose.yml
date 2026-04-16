@@ -1,0 +1,112 @@
+# docker-compose.yml — HouseMind
+# Complete local development stack:
+#   postgres   → PostgreSQL 15 with persisted volume
+#   localstack → S3-compatible local storage (no AWS account needed)
+#   backend    → FastAPI with hot-reload
+#   frontend   → Next.js with hot-reload
+#
+# Usage:
+#   docker compose up              # start all services
+#   docker compose up postgres     # database only (for local Python dev)
+#   docker compose down -v         # tear down including volumes
+#
+# Prerequisites:
+#   - Docker Desktop 4.x+
+#   - Copy backend/.env.example → backend/.env
+#   - Copy frontend/.env.local.example → frontend/.env.local
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: housemind
+      POSTGRES_PASSWORD: housemind
+      POSTGRES_DB: housemind_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U housemind -d housemind_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── LocalStack (S3 emulation) ─────────────────────────────────────────────
+  localstack:
+    image: localstack/localstack:3.4
+    restart: unless-stopped
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: ap-southeast-1
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      PERSISTENCE: 1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./infra/localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── FastAPI Backend ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: local
+      DATABASE_URL: postgresql+asyncpg://housemind:housemind@postgres:5432/housemind_dev
+      SECRET_KEY: dev-only-insecure-key-change-before-staging-min64chars-padpadpad
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_DEFAULT_REGION: ap-southeast-1
+      AWS_ENDPOINT_URL: http://localstack:4566
+      S3_BUCKET_NAME: housemind-dev-bucket
+      CORS_ORIGINS: http://localhost:3000
+      SENTRY_DSN: ""
+      LOG_LEVEL: DEBUG
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app"
+
+  # ── Next.js Frontend ───────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/v1
+      NEXT_PUBLIC_APP_ENV: local
+      NEXT_PUBLIC_SENTRY_DSN: ""
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  localstack_data:

@@ -1,0 +1,97 @@
+# ─────────────────────────────────────────────────────────────────
+# UptimeRobot Monitor Configuration — HouseMind
+#
+# This file documents the monitor settings to configure manually
+# in the UptimeRobot dashboard (https://uptimerobot.com).
+#
+# UptimeRobot does not have a public Terraform provider on the
+# free tier. Configure monitors via dashboard or their REST API
+# using the values below.
+#
+# REST API endpoint: https://api.uptimerobot.com/v2/newMonitor
+# ─────────────────────────────────────────────────────────────────
+
+monitors:
+  # ── Primary liveness check ────────────────────────────────────
+  - name: "HouseMind API — liveness"
+    type: HTTP(s)                         # type code: 1
+    url: "https://api.housemind.app/health"
+    interval_minutes: 5
+    timeout_seconds: 30
+    http_method: GET
+    keyword_check:
+      enabled: true
+      keyword: '"status":"ok"'            # must appear in response body
+      alert_if_not_found: true
+
+    alert_contacts:
+      # Add contacts from your UptimeRobot account
+      - type: email
+        value: "devops@housemind.app"
+      # Optional Slack webhook (uncomment when workspace is ready):
+      # - type: slack
+      #   value: "https://hooks.slack.com/services/TXXXXXXXX/BXXXXXXXX/XXXXXXXX"
+
+    alert_settings:
+      notify_when_down: 1               # alert on first failure
+      notify_when_back_up: true
+      notify_after_n_minutes: 0         # immediate
+
+  # ── Frontend liveness check ───────────────────────────────────
+  - name: "HouseMind Frontend"
+    type: HTTP(s)
+    url: "https://housemind.app"
+    interval_minutes: 5
+    timeout_seconds: 30
+    http_method: GET
+    keyword_check:
+      enabled: false
+
+    alert_contacts:
+      - type: email
+        value: "devops@housemind.app"
+
+    alert_settings:
+      notify_when_down: 1
+      notify_when_back_up: true
+      notify_after_n_minutes: 0
+
+# ─────────────────────────────────────────────────────────────────
+# Setup via UptimeRobot REST API (one-time bootstrap)
+#
+# Export your API key from:
+#   UptimeRobot Dashboard → My Settings → API Settings → Main API Key
+#
+# Then run:
+#   export UPTIMEROBOT_API_KEY=ur<your_key>
+#   bash infra/uptimerobot/bootstrap.sh
+#
+# bootstrap.sh wraps the calls below.
+# ─────────────────────────────────────────────────────────────────
+
+api_calls:
+  create_api_monitor:
+    method: POST
+    url: https://api.uptimerobot.com/v2/newMonitor
+    body:
+      api_key: "${UPTIMEROBOT_API_KEY}"
+      friendly_name: "HouseMind API — liveness"
+      url: "https://api.housemind.app/health"
+      type: 1               # 1 = HTTP(s)
+      interval: 300         # 5 minutes in seconds
+      timeout: 30
+      http_method: 2        # 2 = GET
+      keyword_type: 1       # 1 = keyword exists
+      keyword_value: '"status":"ok"'
+
+  create_frontend_monitor:
+    method: POST
+    url: https://api.uptimerobot.com/v2/newMonitor
+    body:
+      api_key: "${UPTIMEROBOT_API_KEY}"
+      friendly_name: "HouseMind Frontend"
+      url: "https://housemind.app"
+      type: 1
+      interval: 300
+      timeout: 30
+      http_method: 2

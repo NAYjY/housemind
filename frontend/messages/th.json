@@ -1,0 +1,44 @@
+{
+  "common": {
+    "loading": "กำลังโหลด...",
+    "error": "เกิดข้อผิดพลาด",
+    "retry": "ลองใหม่",
+    "close": "ปิด",
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "delete": "ลบ",
+    "resolve": "ทำเครื่องหมายว่าแก้ไขแล้ว",
+    "reopen": "เปิดใหม่",
+    "back": "กลับ"
+  },
+  "workspace": {
+    "title": "พื้นที่ทำงาน",
+    "tapToAnnotate": "แตะบนรูปภาพเพื่อเพิ่มหมายเหตุ",
+    "longPressToDelete": "กดค้างที่หมุดเพื่อลบ",
+    "readOnly": "โหมดอ่านอย่างเดียว",
+    "noAnnotations": "ยังไม่มีหมายเหตุ",
+    "annotationResolved": "แก้ไขแล้ว",
+    "annotationOpen": "รอดำเนินการ"
+  },
+  "product": {
+    "details": "รายละเอียดสินค้า",
+    "brand": "แบรนด์",
+    "model": "รุ่น",
+    "price": "ราคา",
+    "description": "รายละเอียด",
+    "specs": "ข้อมูลจำเพาะ",
+    "noProduct": "ยังไม่ได้เชื่อมโยงสินค้า",
+    "currency": "บาท"
+  },
+  "auth": {
+    "expired": "ลิงก์หมดอายุแล้ว",
+    "expiredMessage": "กรุณาขอลิงก์ใหม่จากสถาปนิก",
+    "sessionExpired": "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"
+  },
+  "roles": {
+    "architect": "สถาปนิก",
+    "contractor": "ผู้รับเหมา",
+    "homeowner": "เจ้าของบ้าน",
+    "supplier": "ผู้จัดจำหน่าย"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "resolve": "Mark as resolved",
+    "reopen": "Reopen",
+    "back": "Back"
+  },
+  "workspace": {
+    "title": "Workspace",
+    "tapToAnnotate": "Tap on the image to add an annotation",
+    "longPressToDelete": "Long-press a pin to delete it",
+    "readOnly": "Read-only mode",
+    "noAnnotations": "No annotations yet",
+    "annotationResolved": "Resolved",
+    "annotationOpen": "Open"
+  },
+  "product": {
+    "details": "Product details",
+    "brand": "Brand",
+    "model": "Model",
+    "price": "Price",
+    "description": "Description",
+    "specs": "Specifications",
+    "noProduct": "No product linked",
+    "currency": "THB"
+  },
+  "auth": {
+    "expired": "Link expired",
+    "expiredMessage": "Please request a new link from the architect",
+    "sessionExpired": "Session expired. Please sign in again."
+  },
+  "roles": {
+    "architect": "Architect",
+    "contractor": "Contractor",
+    "homeowner": "Homeowner",
+    "supplier": "Supplier"
+  }
+}

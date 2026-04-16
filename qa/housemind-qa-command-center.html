@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HouseMind QA Command Center</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f6;color:#1a1a18;padding:1rem;max-width:860px;margin:0 auto}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #e0dfd8;margin-bottom:1.5rem}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:#888780;border-bottom:2px solid transparent;transition:all .15s}
+.tab.active{color:#1a1a18;border-bottom-color:#7F77DD}
+.section{display:none}.section.active{display:block}
+.badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.badge-p0{background:#FCEBEB;color:#A32D2D}
+.badge-p1{background:#FAEEDA;color:#854F0B}
+.badge-pass{background:#EAF3DE;color:#3B6D11}
+.badge-fail{background:#FCEBEB;color:#A32D2D}
+.badge-warn{background:#FAEEDA;color:#854F0B}
+.badge-info{background:#E6F1FB;color:#185FA5}
+.card{background:#fff;border:0.5px solid #e0dfd8;border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+.card-title{font-size:14px;font-weight:500}
+.card-sub{font-size:12px;color:#888780;margin-top:2px}
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem}
+.metric{background:#f1efe8;border-radius:8px;padding:14px 12px;text-align:center}
+.metric-val{font-size:22px;font-weight:500;display:block}
+.metric-label{font-size:11px;color:#888780;margin-top:2px}
+.metric-limit{font-size:10px;color:#b4b2a9;margin-top:1px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:6px 8px;font-size:11px;font-weight:500;color:#888780;border-bottom:0.5px solid #e0dfd8}
+td{padding:7px 8px;border-bottom:0.5px solid #e0dfd8;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.policy-block{border-left:3px solid #7F77DD;padding:8px 12px;margin-bottom:10px;background:#f1efe8;border-radius:0 8px 8px 0}
+.policy-label{font-size:11px;font-weight:500;color:#534AB7;margin-bottom:3px}
+.policy-text{font-size:13px;line-height:1.5}
+.signoff-box{border:1.5px solid #639922;border-radius:12px;padding:1rem 1.25rem;background:#EAF3DE;margin-top:1rem}
+.signoff-box.blocked{border-color:#E24B4A;background:#FCEBEB}
+.signoff-box.pending{border-color:#EF9F27;background:#FAEEDA}
+.signoff-title{font-size:14px;font-weight:500;margin-bottom:4px;color:#3B6D11}
+.signoff-title.blocked{color:#A32D2D}
+.signoff-title.pending{color:#854F0B}
+.step{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start}
+.step-num{min-width:22px;height:22px;border-radius:50%;background:#EEEDFE;color:#534AB7;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-text{font-size:13px;line-height:1.5}
+code{font-family:'SF Mono',Consolas,monospace;font-size:11px;background:#f1efe8;padding:2px 5px;border-radius:4px}
+.section-label{font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;margin-top:1.25rem}
+.input-row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.sim-val{font-size:12px;font-weight:500;min-width:52px}
+.sim-label{font-size:12px;color:#888780;min-width:130px}
+input[type=range]{flex:1}
+select{padding:4px 8px;border-radius:6px;border:0.5px solid #c0bfb8;font-size:12px;background:#fff}
+.build-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid #e0dfd8;gap:8px;flex-wrap:wrap}
+.build-row:last-child{border-bottom:none}
+.ticket{border:0.5px solid #e0dfd8;border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.ticket-title{font-size:13px;font-weight:500;margin:3px 0}
+.ticket-meta{font-size:11px;color:#888780;line-height:1.7}
+.top-bar{display:flex;align-items:center;gap:10px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:0.5px solid #e0dfd8}
+.avatar{width:36px;height:36px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;color:#534AB7;flex-shrink:0}
+@media(max-width:600px){.metric-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="avatar">QA</div>
+  <div style="flex:1">
+    <p style="font-size:15px;font-weight:500">HouseMind QA Command Center</p>
+    <p style="font-size:12px;color:#888780">Primary device: Samsung Galaxy A13 · AIS 4G · Build: staging</p>
+  </div>
+  <span class="badge badge-warn">beta · pre-release</span>
+</div>
+
+<nav class="tabs">
+  <button class="tab active" onclick="switchTab('device',this)">Device setup</button>
+  <button class="tab" onclick="switchTab('perf',this)">Performance criteria</button>
+  <button class="tab" onclick="switchTab('triage',this)">Bug triage</button>
+  <button class="tab" onclick="switchTab('gate',this)">Release gate</button>
+</nav>
+
+<!-- TAB 1: Device Setup -->
+<div id="tab-device" class="section active">
+  <div class="section-label">Primary test device</div>
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Samsung Galaxy A13</div>
+        <div class="card-sub">Physical device · AIS 4G SIM · Android 13</div>
+      </div>
+      <span class="badge badge-pass">Preferred</span>
+    </div>
+    <table>
+      <tr><td style="color:#888780;width:140px">Model</td><td>Samsung Galaxy A13 (SM-A135F)</td></tr>
+      <tr><td style="color:#888780">OS</td><td>Android 13 (One UI 5.1)</td></tr>
+      <tr><td style="color:#888780">RAM</td><td>4 GB</td></tr>
+      <tr><td style="color:#888780">CPU</td><td>Exynos 850 · 8-core · 2.0 GHz</td></tr>
+      <tr><td style="color:#888780">Screen</td><td>6.6" · 1080×2408 · 60 Hz</td></tr>
+      <tr><td style="color:#888780">Network</td><td>AIS 4G LTE (Bangkok / Hat Yai coverage)</td></tr>
+      <tr><td style="color:#888780">Status</td><td><span class="badge badge-pass">✓ Configured</span></td></tr>
+    </table>
+  </div>
+
+  <div class="section-label">Setup checklist</div>
+  <div class="card">
+    <div class="step"><div class="step-num">1</div><div class="step-text">Enable Developer Options → USB Debugging. Connect via USB and confirm <code>adb devices</code> lists the A13.</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Install Chrome stable (latest). Set as default browser. Disable auto-updates during test window to prevent mid-sprint browser drift.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Insert AIS 4G SIM. Verify LTE signal ≥ −100 dBm in test location. Run <code>fast.com</code> baseline: DL ≥ 5 Mbps, ping ≤ 80 ms.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Install Perfetto or use <code>adb shell dumpsys meminfo</code> for memory snapshots. Document baseline memory at idle (expected ≈ 2.1 GB used on A13).</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Configure Chrome DevTools remote debugging via <code>chrome://inspect</code> on host machine. Validate connection to staging URL.</div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text">Disable Battery Optimisation for Chrome to prevent CPU throttling during long test sessions.</div></div>
+    <div class="step"><div class="step-num">7</div><div class="step-text">Create a test Homeowner account via magic link. Complete onboarding and land in an annotated project with ≥ 5 images. Save session cookie state.</div></div>
+  </div>
+
+  <div class="section-label">Fallback: BrowserStack</div>
+  <div class="card" style="border-color:#EF9F27">
+    <div class="card-header">
+      <div>
+        <div class="card-title">BrowserStack (remote device cloud)</div>
+        <div class="card-sub">Fallback when A13 is physically unavailable</div>
+      </div>
+      <span class="badge badge-warn">Fallback only</span>
+    </div>
+    <p style="font-size:13px;line-height:1.6;margin-bottom:10px">All latency and memory metrics collected via BrowserStack are <strong>informational only</strong>. They do not satisfy performance acceptance criteria and cannot be used for pass/fail decisions.</p>
+    <table>
+      <tr><td style="color:#888780;width:140px">Device profile</td><td>Samsung Galaxy A13 → Android 13</td></tr>
+      <tr><td style="color:#888780">Network throttle</td><td>3G preset (unreliable vs physical SIM)</td></tr>
+      <tr><td style="color:#888780">Latency caveat</td><td><span class="badge badge-fail">Remote relay adds 80–200 ms artifact</span></td></tr>
+      <tr><td style="color:#888780">Memory caveat</td><td>Container-level memory ≠ real device heap</td></tr>
+      <tr><td style="color:#888780">Valid for</td><td>Visual regression, tap target QA, locale layout checks</td></tr>
+    </table>
+  </div>
+
+  <div class="section-label">Device coverage matrix</div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Device</th><th>OS / Browser</th><th>Roles tested</th><th>Perf authoritative</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Samsung A13</strong></td><td>Android 13 · Chrome</td><td>All roles</td><td><span class="badge badge-pass">Yes — primary</span></td></tr>
+        <tr><td>iPhone SE 3rd gen</td><td>iOS 17 · Safari</td><td>Homeowner, Client</td><td><span class="badge badge-warn">Secondary</span></td></tr>
+        <tr><td>iPad 9th gen</td><td>iPadOS 17 · Safari</td><td>Architect</td><td><span class="badge badge-warn">Secondary</span></td></tr>
+        <tr><td>BrowserStack A13</td><td>Android 13 · Chrome</td><td>Visual / locale</td><td><span class="badge badge-fail">No</span></td></tr>
+        <tr><td>Desktop Chrome</td><td>macOS/Win · Chrome</td><td>Architect dev flows</td><td><span class="badge">n/a</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 2: Performance -->
+<div id="tab-perf" class="section">
+  <div class="metric-grid">
+    <div class="metric">
+      <span class="metric-val" id="panel-val">—</span>
+      <div class="metric-label">Panel open</div>
+      <div class="metric-limit">limit: 500 ms</div>
+    </div>
+    <div class="metric">
+      <span class="metric-val" id="load-val">—</span>
+      <div class="metric-label">Cold load (3G)</div>
+      <div class="metric-limit">limit: 3.0 s</div>
+    </div>
+    <div class="metric">
+      <span class="metric-val" id="mem-val">—</span>
+      <div class="metric-label">Memory (5 images)</div>
+      <div class="metric-limit">limit: 200 MB</div>
+    </div>
+  </div>
+
+  <div class="section-label">Live simulator — drag to enter build results</div>
+  <div class="card">
+    <div class="input-row">
+      <span class="sim-label">Panel open (ms)</span>
+      <input type="range" min="100" max="900" value="380" step="10" id="s-panel" oninput="updateSim()">
+      <span class="sim-val" id="s-panel-v">380 ms</span>
+    </div>
+    <div class="input-row">
+      <span class="sim-label">Cold load 3G (ms)</span>
+      <input type="range" min="500" max="6000" value="2400" step="100" id="s-load" oninput="updateSim()">
+      <span class="sim-val" id="s-load-v">2.4 s</span>
+    </div>
+    <div class="input-row">
+      <span class="sim-label">Memory after 5 images (MB)</span>
+      <input type="range" min="40" max="400" value="145" step="5" id="s-mem" oninput="updateSim()">
+      <span class="sim-val" id="s-mem-v">145 MB</span>
+    </div>
+    <div id="sim-verdict"></div>
+  </div>
+
+  <div class="section-label">TC-PERF-01 · Annotation panel open &lt; 500 ms</div>
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Tap annotation pin → panel slides up → fully interactive</div>
+        <div class="card-sub">Measured: tap event → panel transitionend + first input responsive</div>
+      </div>
+      <span class="badge badge-p0">P0 if fail</span>
+    </div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Open annotated project with ≥ 5 image tiles. Wait for all tiles to settle (no loading spinners visible).</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Open Chrome DevTools Performance tab via remote debug on host machine. Start recording.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Tap an annotation pin. Measure: tap event timestamp → panel <code>transitionend</code> + first interactive input enabled.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Repeat 5 times on different pins. Record median. Any single run ≥ 500 ms = P0 — do not average past it.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Log: <code>BUILD · date · median ms · min ms · max ms · pass/fail · screen-recording URL</code></div></div>
+  </div>
+
+  <div class="section-label">TC-PERF-02 · Cold load on throttled 3G &lt; 3 s LCP</div>
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Chrome 3G throttle: 1.5 Mbps DL / 750 Kbps UL / 400 ms RTT</div>
+        <div class="card-sub">Measured: navigation start → Largest Contentful Paint (annotation canvas rendered)</div>
+      </div>
+      <span class="badge badge-p0">P0 if fail</span>
+    </div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">In Chrome DevTools (remote), set Network → Custom: 1.5 Mbps / 750 Kbps / 400 ms latency. Name it "HouseMind-3G".</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Clear cache: <code>Settings → Privacy → Clear browsing data → All time</code>. Hard-reload via DevTools (Shift+Reload).</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Navigate to the staging project URL (logged-in session via magic link cookie). Timer starts at navigation start.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Stop at LCP: annotation workspace canvas first paints with content. Read from Performance panel → Timings row.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Run 3 cold loads. Accept median. Log: <code>BUILD · LCP ms · pass/fail</code></div></div>
+  </div>
+
+  <div class="section-label">TC-PERF-03 · Memory &lt; 200 MB after 5 images</div>
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Heap PSS delta via adb after scrolling all tiles</div>
+        <div class="card-sub">Δ = (post-interaction PSS) − (baseline at launch)</div>
+      </div>
+      <span class="badge badge-p0">P0 if fail</span>
+    </div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Kill Chrome fully. Launch fresh. Navigate to project. Record baseline: <code>adb shell dumpsys meminfo com.android.chrome | grep "TOTAL PSS"</code></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Scroll through all 5 image tiles. Open and close each annotation panel once. Wait 5 s for GC.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Capture: <code>adb shell dumpsys meminfo com.android.chrome | grep "TOTAL PSS"</code>. Record PSS in MB.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Δ = (post − baseline). Threshold: Δ &lt; 200 MB. Any result ≥ 200 MB = P0 regardless of absolute value.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Log: <code>BUILD · baseline MB · post MB · delta MB · pass/fail</code></div></div>
+  </div>
+
+  <div class="section-label">Build log</div>
+  <div class="card">
+    <div class="build-row" style="font-size:11px;color:#888780;font-weight:500"><span>Build</span><span>Panel</span><span>Load 3G</span><span>Memory</span><span>Gate</span></div>
+    <div class="build-row"><span style="font-size:12px">staging-001</span><span class="badge badge-pass">412 ms</span><span class="badge badge-pass">2.6 s</span><span class="badge badge-pass">138 MB</span><span class="badge badge-pass">✓ pass</span></div>
+    <div class="build-row"><span style="font-size:12px">staging-002</span><span class="badge badge-fail">547 ms</span><span class="badge badge-pass">2.8 s</span><span class="badge badge-warn">188 MB</span><span class="badge badge-fail">✗ blocked</span></div>
+    <div class="build-row"><span style="font-size:12px;color:#b4b2a9">staging-003</span><span style="font-size:12px;color:#b4b2a9">pending</span><span style="font-size:12px;color:#b4b2a9">pending</span><span style="font-size:12px;color:#b4b2a9">pending</span><span style="font-size:12px;color:#b4b2a9">—</span></div>
+  </div>
+</div>
+
+<!-- TAB 3: Bug Triage -->
+<div id="tab-triage" class="section">
+  <div class="section-label">Severity definitions</div>
+
+  <div class="policy-block" style="border-left-color:#E24B4A">
+    <div class="policy-label" style="color:#A32D2D">P0 — Release blocker</div>
+    <div class="policy-text">Release cannot proceed. Requires immediate fix and re-test on physical A13 before any shipment. QA holds a hard block. Cannot be overridden by PM or Engineering.</div>
+  </div>
+  <div class="policy-block" style="border-left-color:#EF9F27">
+    <div class="policy-label" style="color:#854F0B">P1 — Mitigation required</div>
+    <div class="policy-text">Release may proceed only after a documented mitigation plan is reviewed and approved by QA. Workaround must be communicated to affected users before deployment.</div>
+  </div>
+  <div class="policy-block" style="border-left-color:#378ADD">
+    <div class="policy-label" style="color:#185FA5">P2 — Tracked, non-blocking</div>
+    <div class="policy-text">Logged in Linear with target milestone. Does not block release. Reviewed in next sprint planning.</div>
+  </div>
+  <div class="policy-block" style="border-left-color:#e0dfd8">
+    <div class="policy-label">P3 — Nice to fix</div>
+    <div class="policy-text">Cosmetic, edge-case, or very low frequency. Backlogged. No release impact.</div>
+  </div>
+
+  <div class="section-label">Automatic P0 triggers</div>
+  <div class="card" style="border-left:3px solid #E24B4A">
+    <table>
+      <thead><tr><th>Condition</th><th>Threshold</th></tr></thead>
+      <tbody>
+        <tr><td>Annotation tap-to-panel time</td><td><span class="badge badge-fail">&gt; 500 ms on A13</span></td></tr>
+        <tr><td>Cold load on throttled 3G</td><td><span class="badge badge-fail">&gt; 3,000 ms LCP</span></td></tr>
+        <tr><td>Memory after 5 images</td><td><span class="badge badge-fail">Δ &gt; 200 MB PSS</span></td></tr>
+        <tr><td>Magic link auth failure</td><td><span class="badge badge-fail">Any failure rate &gt; 0%</span></td></tr>
+        <tr><td>Annotation data loss on reload</td><td><span class="badge badge-fail">Any annotation lost</span></td></tr>
+        <tr><td>Perf regression vs prior passing build</td><td><span class="badge badge-fail">&gt; 20% degradation on any metric</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-label">Linear ticket templates</div>
+
+  <div class="ticket" style="border-left:3px solid #E24B4A">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span class="badge badge-p0">P0</span>
+      <span style="font-family:monospace;font-size:11px;color:#888780">HM-QA-###</span>
+    </div>
+    <div class="ticket-title">[P0] [A13] Annotation panel open: {N} ms — exceeds 500 ms threshold</div>
+    <div class="ticket-meta">
+      <strong>Device:</strong> Samsung Galaxy A13 · AIS 4G · Chrome {version}<br>
+      <strong>Build:</strong> staging-{build-id} · {date}<br>
+      <strong>Steps to reproduce:</strong><br>
+      1. Open project: {project-url}<br>
+      2. Wait for all tiles to load (no spinners)<br>
+      3. Tap annotation pin #{pin-id}<br>
+      4. Measure: tap event → panel transitionend<br>
+      <strong>Measured:</strong> {N} ms (median of 5 runs; range: {min}–{max} ms)<br>
+      <strong>Expected:</strong> &lt; 500 ms<br>
+      <strong>Attach:</strong> Performance trace (.json) + screen recording (AZ Screen Recorder)<br>
+      <strong>Release impact:</strong> BLOCKED — cannot ship until resolved and re-tested on physical A13
+    </div>
+  </div>
+
+  <div class="ticket" style="border-left:3px solid #EF9F27">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span class="badge badge-p1">P1</span>
+      <span style="font-family:monospace;font-size:11px;color:#888780">HM-QA-###</span>
+    </div>
+    <div class="ticket-title">[P1] [iPad] Annotation canvas misaligned in landscape — touch offset 12 px</div>
+    <div class="ticket-meta">
+      <strong>Device:</strong> iPad 9th gen · iPadOS 17 · Safari<br>
+      <strong>Build:</strong> staging-{build-id}<br>
+      <strong>Steps:</strong><br>
+      1. Rotate iPad to landscape orientation<br>
+      2. Tap an annotation region on the canvas<br>
+      3. Observe canvas hit-area vs visual pin offset<br>
+      <strong>Measured offset:</strong> 12 px X-axis drift<br>
+      <strong>Mitigation required:</strong> disable landscape mode on iPad OR add CSS transform correction before release<br>
+      <strong>Attach:</strong> annotated screenshot + touch event log
+    </div>
+  </div>
+
+  <div class="ticket" style="border-left:3px solid #378ADD">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span class="badge badge-info">P2</span>
+      <span style="font-family:monospace;font-size:11px;color:#888780">HM-QA-###</span>
+    </div>
+    <div class="ticket-title">[P2] [TH locale] Long Thai supplier name overflows annotation panel label</div>
+    <div class="ticket-meta">
+      <strong>Device:</strong> Samsung A13 · Chrome · Thai (TH) locale<br>
+      <strong>Build:</strong> staging-{build-id}<br>
+      <strong>Steps:</strong><br>
+      1. Set device locale to Thai<br>
+      2. Open annotation panel for supplier product with name &gt; 40 chars<br>
+      3. Observe label overflow clipping<br>
+      <strong>Expected:</strong> text-overflow: ellipsis or wraps gracefully<br>
+      <strong>Target milestone:</strong> Sprint {N+1}
+    </div>
+  </div>
+
+  <div class="section-label">Triage flow</div>
+  <div class="card">
+    <div class="step"><div class="step-num">1</div><div class="step-text">QA discovers issue on A13 or via automated test failure. Creates Linear ticket immediately with full repro steps, media, and build ID.</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">QA assigns severity using policy above. If any automatic P0 trigger is met → P0, no discussion required or permitted.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">For P0: post in <code>#housemind-releases</code> immediately. Tag build as BLOCKED in Linear. Freeze deployment pipeline.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">For P1: QA and PM agree on written mitigation plan within 24 h. Plan must be attached to Linear ticket before release candidate is tagged.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Fix deployed → QA re-tests on physical A13 → updates ticket with new results → signs off or re-blocks.</div></div>
+  </div>
+</div>
+
+<!-- TAB 4: Release Gate -->
+<div id="tab-gate" class="section">
+  <div class="section-label">Authority</div>
+  <div class="policy-block">
+    <div class="policy-label">QA holds final release gate — no exceptions</div>
+    <div class="policy-text">No build may be promoted to production without explicit written QA sign-off. Engineering, PM, and design cannot override. QA sign-off is the final step before any production deployment.</div>
+  </div>
+
+  <div class="section-label">Sign-off checklist — run per release candidate</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Check</th><th>Method</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>TC-PERF-01 panel open &lt; 500 ms</td><td>Physical A13</td><td><select onchange="updateGate()" id="c1"><option value="pending">— pending</option><option value="pass">✓ pass</option><option value="fail">✗ fail</option></select></td></tr>
+        <tr><td>TC-PERF-02 cold load &lt; 3 s (3G)</td><td>Physical A13</td><td><select onchange="updateGate()" id="c2"><option value="pending">— pending</option><option value="pass">✓ pass</option><option value="fail">✗ fail</option></select></td></tr>
+        <tr><td>TC-PERF-03 memory &lt; 200 MB</td><td>Physical A13</td><td><select onchange="updateGate()" id="c3"><option value="pending">— pending</option><option value="pass">✓ pass</option><option value="fail">✗ fail</option></select></td></tr>
+        <tr><td>Magic link auth — all 4 roles</td><td>A13 + iPhone SE</td><td><select onchange="updateGate()" id="c4"><option value="pending">— pending</option><option value="pass">✓ pass</option><option value="fail">✗ fail</option></select></td></tr>
+        <tr><td>Annotation persistence on reload</td><td>Physical A13</td><td><select onchange="updateGate()" id="c5"><option value="pending">— pending</option><option value="pass">✓ pass</option><option value="fail">✗ fail</option></select></td></tr>
+        <tr><td>Thai locale layout — no overflow</td><td>A13 · TH locale</td><td><select onchange="updateGate()" id="c6"><option value="pending">— pending</option><option value="pass">✓ pass</option><option value="fail">✗ fail</option></select></td></tr>
+        <tr><td>No open P0 tickets in Linear</td><td>Linear board review</td><td><select onchange="updateGate()" id="c7"><option value="pending">— pending</option><option value="pass">✓ confirmed</option><option value="fail">✗ P0 open</option></select></td></tr>
+        <tr><td>P1 mitigations documented</td><td>Linear + PM approval</td><td><select onchange="updateGate()" id="c8"><option value="pending">— pending</option><option value="pass">✓ confirmed</option><option value="fail">✗ missing</option></select></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="gate-verdict"></div>
+
+  <div class="section-label">Escalation path</div>
+  <div class="card">
+    <p style="font-size:13px;line-height:1.6;margin-bottom:10px"><strong>Silent deferral is forbidden.</strong> If a performance threshold is not met on A13, the team must hold a scope reduction discussion before the next release candidate is cut. Issues may not be carried forward silently.</p>
+    <p style="font-size:13px;line-height:1.6;margin-bottom:10px"><strong>Regression = P0 automatically.</strong> Any metric that degrades &gt; 20% vs the previous passing build is a P0, even if it stays under the absolute threshold. Both absolute and regression conditions must be clean for a pass.</p>
+    <p style="font-size:13px;line-height:1.6;margin-bottom:10px"><strong>Escalation chain:</strong> QA block → Engineering Lead → CTO. PM cannot override QA at any level of the chain.</p>
+    <p style="font-size:13px;line-height:1.6"><strong>Linear configuration required:</strong> Labels P0, P1, P2, P3 must exist. Milestone "Release Gate" must exist. QA sign-off = merging label <code>qa-approved</code> to the release branch.</p>
+  </div>
+</div>
+
+<script>
+function switchTab(name, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function updateSim(){
+  const panel=parseInt(document.getElementById('s-panel').value);
+  const load=parseInt(document.getElementById('s-load').value);
+  const mem=parseInt(document.getElementById('s-mem').value);
+  document.getElementById('s-panel-v').textContent=panel+' ms';
+  document.getElementById('s-load-v').textContent=(load/1000).toFixed(1)+' s';
+  document.getElementById('s-mem-v').textContent=mem+' MB';
+  document.getElementById('panel-val').textContent=panel+' ms';
+  document.getElementById('load-val').textContent=(load/1000).toFixed(1)+' s';
+  document.getElementById('mem-val').textContent=mem+' MB';
+  let issues=[];
+  if(panel>=500) issues.push('<span class="badge badge-fail">Panel '+panel+' ms ≥ 500 ms — P0</span>');
+  if(load>=3000) issues.push('<span class="badge badge-fail">Load '+(load/1000).toFixed(1)+' s ≥ 3.0 s — P0</span>');
+  if(mem>=200) issues.push('<span class="badge badge-fail">Memory '+mem+' MB ≥ 200 MB — P0</span>');
+  const v=document.getElementById('sim-verdict');
+  if(issues.length===0){
+    v.innerHTML='<div class="signoff-box"><div class="signoff-title">All thresholds pass — build eligible for QA sign-off</div></div>';
+  } else {
+    v.innerHTML='<div class="signoff-box blocked"><div class="signoff-title blocked">Release BLOCKED — '+issues.length+' P0(s) detected</div><div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">'+issues.map(i=>'<div style="font-size:12px">'+i+'</div>').join('')+'</div></div>';
+  }
+}
+
+function updateGate(){
+  const ids=['c1','c2','c3','c4','c5','c6','c7','c8'];
+  const vals=ids.map(id=>document.getElementById(id).value);
+  const fails=vals.filter(v=>v==='fail').length;
+  const pending=vals.filter(v=>v==='pending').length;
+  const v=document.getElementById('gate-verdict');
+  if(fails>0){
+    v.innerHTML='<div class="signoff-box blocked"><div class="signoff-title blocked">BLOCKED — '+fails+' check(s) failed. Release cannot proceed.</div><p style="font-size:12px;color:#A32D2D;margin-top:6px">Resolve all failures, re-test on physical A13, and re-submit for QA sign-off.</p></div>';
+  } else if(pending>0){
+    v.innerHTML='<div class="signoff-box pending"><div class="signoff-title pending">Incomplete — '+pending+' check(s) still pending</div><p style="font-size:12px;color:#854F0B;margin-top:6px">Complete all checks on physical A13 before requesting QA sign-off.</p></div>';
+  } else {
+    v.innerHTML='<div class="signoff-box"><div class="signoff-title">QA Sign-off GRANTED — all checks pass. Build eligible for production deployment.</div></div>';
+  }
+}
+
+updateSim();
+updateGate();
+</script>
+</body>
+</html>

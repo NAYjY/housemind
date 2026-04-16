@@ -1,0 +1,133 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# HouseMind — Environment Variable Reference
+#
+# This file documents every env var by service.
+# VALUES ARE NEVER STORED HERE. Use:
+#   - Railway dashboard  → backend runtime vars
+#   - Vercel dashboard   → frontend build + runtime vars
+#   - GitHub Secrets     → CI/CD pipeline vars
+#   - 1Password / Vault  → secret source of truth
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# BACKEND (Railway)
+# Set in: Railway Dashboard → Service → Variables
+# ═════════════════════════════════════════════════════════════════════════════
+
+[backend.required]
+
+ENVIRONMENT            # "staging" | "production"
+SECRET_KEY             # JWT signing key — min 64 random bytes, base64url encoded
+DATABASE_URL           # postgresql+asyncpg://user:pass@host:5432/housemind
+GIT_SHA                # injected by Railway automatically from git commit
+
+[backend.s3]
+
+AWS_ACCESS_KEY_ID      # IAM key for S3 bucket access
+AWS_SECRET_ACCESS_KEY  # IAM secret for S3 bucket access
+AWS_DEFAULT_REGION     # ap-southeast-1 (Singapore — closest to Thailand)
+S3_BUCKET_NAME         # e.g. housemind-assets-prod
+
+[backend.monitoring]
+
+SENTRY_DSN             # https://xxx@oXXX.ingest.sentry.io/XXX
+                       # Leave empty in local/test to disable Sentry
+
+[backend.cors]
+
+CORS_ORIGINS           # Comma-separated allowed origins
+                       # e.g. https://housemind.app,https://staging.housemind.app
+
+[backend.optional]
+
+LOG_LEVEL              # "INFO" (default) | "DEBUG" | "WARNING"
+WORKERS                # Uvicorn worker count — Railway sets this automatically
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FRONTEND (Vercel)
+# Set in: Vercel Dashboard → Project → Settings → Environment Variables
+# Prefix NEXT_PUBLIC_ = exposed to browser bundle
+# ═════════════════════════════════════════════════════════════════════════════
+
+[frontend.public]
+
+NEXT_PUBLIC_APP_ENV          # "production" | "staging"
+NEXT_PUBLIC_API_BASE_URL     # https://api.housemind.app/v1
+NEXT_PUBLIC_SENTRY_DSN       # Frontend Sentry DSN (separate project from backend)
+
+[frontend.server_only]
+# These are NOT prefixed NEXT_PUBLIC_ — server-side only
+
+# (none required at MVP)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# GITHUB SECRETS (CI/CD)
+# Set in: GitHub → Repo → Settings → Secrets and variables → Actions
+# ═════════════════════════════════════════════════════════════════════════════
+
+[github_secrets]
+
+RAILWAY_TOKEN          # Railway API token — Project → Settings → Tokens
+RAILWAY_SERVICE_NAME   # Name of the Railway service (e.g. "housemind-api")
+BACKEND_URL            # https://api.housemind.app (used for health check after deploy)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# INFRA BOOTSTRAP (one-time setup scripts)
+# Export locally when running infra/uptimerobot/bootstrap.sh
+# ═════════════════════════════════════════════════════════════════════════════
+
+[bootstrap]
+
+UPTIMEROBOT_API_KEY    # UptimeRobot Main API Key
+ALERT_EMAIL            # Email to receive downtime alerts
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LOCAL DEV (.env — git-ignored)
+# Copy from .env.example in each service directory
+# ═════════════════════════════════════════════════════════════════════════════
+
+[local.backend]  # backend/.env
+
+ENVIRONMENT=local
+SECRET_KEY=dev-only-insecure-key-change-before-staging
+DATABASE_URL=postgresql+asyncpg://housemind:housemind@localhost:5432/housemind_dev
+AWS_ACCESS_KEY_ID=testing
+AWS_SECRET_ACCESS_KEY=testing
+AWS_DEFAULT_REGION=ap-southeast-1
+S3_BUCKET_NAME=housemind-dev-bucket
+SENTRY_DSN=
+CORS_ORIGINS=http://localhost:3000
+
+[local.frontend]  # frontend/.env.local
+
+NEXT_PUBLIC_APP_ENV=local
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/v1
+NEXT_PUBLIC_SENTRY_DSN=
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# EMAIL (added — magic-link dispatch)
+# ═════════════════════════════════════════════════════════════════════════════
+
+[backend.email]
+
+RESEND_API_KEY     # Resend API key for magic-link email dispatch
+                   # Leave empty locally — token logged to console
+                   # https://resend.com → API Keys → Create
+FRONTEND_URL       # Base URL of the frontend, used in email link
+                   # e.g. https://housemind.app (no trailing slash)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LOCAL DEV — Docker Compose (added)
+# ═════════════════════════════════════════════════════════════════════════════
+
+[local.docker]
+
+# When running with docker-compose.yml, these are injected automatically.
+# AWS_ENDPOINT_URL=http://localstack:4566   (overrides real S3 with LocalStack)
+# DATABASE_URL uses postgres service hostname, not localhost
