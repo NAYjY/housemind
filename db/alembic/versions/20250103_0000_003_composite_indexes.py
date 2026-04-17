@@ -50,7 +50,7 @@ def upgrade() -> None:
     # Replaces the plain ix_annotations_image_id for the soft-delete filter case.
     # Partial index only indexes non-deleted rows — much smaller, faster lookups.
     op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS
+        CREATE INDEX IF NOT EXISTS
         ix_annotations_image_id_active
         ON annotations (image_id, created_at)
         WHERE deleted_at IS NULL
@@ -58,7 +58,7 @@ def upgrade() -> None:
 
     # ── 2. Resolved annotations per image (resolve view / progress dashboard) ─
     op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS
+        CREATE INDEX IF NOT EXISTS
         ix_annotations_image_id_resolved
         ON annotations (image_id, resolved_at)
         WHERE resolved_at IS NOT NULL AND deleted_at IS NULL
@@ -66,7 +66,7 @@ def upgrade() -> None:
 
     # ── 3. Active images per project ordered for display ─────────────────────
     op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS
+        CREATE INDEX IF NOT EXISTS
         ix_project_images_project_display
         ON project_images (project_id, display_order, created_at)
         WHERE deleted_at IS NULL
@@ -78,7 +78,7 @@ def upgrade() -> None:
 
     # ── 5. Annotations by creator (audit trail / "my annotations" view) ──────
     op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS
+        CREATE INDEX IF NOT EXISTS
         ix_annotations_created_by_active
         ON annotations (created_by, created_at)
         WHERE deleted_at IS NULL
@@ -86,7 +86,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_annotations_image_id_active")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_annotations_image_id_resolved")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_project_images_project_display")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_annotations_created_by_active")
+    op.execute("DROP INDEX IF EXISTS ix_annotations_image_id_active")
+    op.execute("DROP INDEX IF EXISTS ix_annotations_image_id_resolved")
+    op.execute("DROP INDEX IF EXISTS ix_project_images_project_display")
+    op.execute("DROP INDEX IF EXISTS ix_annotations_created_by_active")

@@ -16,7 +16,7 @@ from .base import Base
 
 PROJECT_STATUS = Enum(
     "draft", "active", "completed", "archived",
-    name="project_status",
+    name="project_status",create_type=False
 )
 
 

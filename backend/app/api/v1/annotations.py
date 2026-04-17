@@ -18,7 +18,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -164,7 +164,7 @@ async def delete_annotation(
     annotation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
-) -> None:
+):
     """
     Soft-delete an annotation. DB record is retained; deleted_at is set.
     Only architects who own the parent project can delete.
@@ -175,6 +175,7 @@ async def delete_annotation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Annotation not found or already deleted",
         )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ── PATCH /annotations/{annotation_id}/resolve ───────────────────────────────

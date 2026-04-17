@@ -20,6 +20,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
+from sqlalchemy.dialects import postgresql
+
 # revision identifiers, used by Alembic
 revision: str = "001_initial_schema"
 down_revision: Union[str, None] = None
@@ -54,7 +56,8 @@ def upgrade() -> None:
         sa.Column("id",                 sa.UUID(as_uuid=True), primary_key=True),
         sa.Column("email",              sa.String(320),  nullable=False),
         sa.Column("full_name",          sa.String(255),  nullable=False),
-        sa.Column("role",               USER_ROLE_ENUM,  nullable=False),
+        # sa.Column("role",               USER_ROLE_ENUM,  nullable=False),
+        sa.Column("role", postgresql.ENUM(name="user_role", create_type=False), nullable=False),
         sa.Column("preferred_language", sa.String(5),    nullable=False,
                   server_default="th"),
         sa.Column("is_active",          sa.Boolean(),    nullable=False,
@@ -77,8 +80,10 @@ def upgrade() -> None:
                   sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
         sa.Column("name",         sa.String(255),  nullable=False),
         sa.Column("description",  sa.Text(),       nullable=True),
-        sa.Column("status",       PROJECT_STATUS_ENUM, nullable=False,
-                  server_default="draft"),
+        # sa.Column("status",       PROJECT_STATUS_ENUM, nullable=False,
+        #           server_default="draft"),
+        sa.Column("status", postgresql.ENUM(name="project_status", create_type=False), 
+                  nullable=False, server_default="draft"),
         sa.Column("created_at",   sa.DateTime(timezone=True),
                   server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at",   sa.DateTime(timezone=True),
@@ -178,8 +183,10 @@ def upgrade() -> None:
         sa.Column("invitee_email",    sa.String(320), nullable=False),
         sa.Column("invitee_role",     sa.String(50),  nullable=False),
         sa.Column("magic_link_token", sa.String(512), nullable=True),
-        sa.Column("status",           INVITE_STATUS_ENUM, nullable=False,
-                  server_default="pending"),
+        # sa.Column("status",           INVITE_STATUS_ENUM, nullable=False,
+        #           server_default="pending"),
+        sa.Column("status", postgresql.ENUM(name="invite_status", create_type=False), 
+                  nullable=False, server_default="pending"),
         sa.Column("expires_at",       sa.DateTime(timezone=True), nullable=True),
         sa.Column("accepted_at",      sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at",       sa.DateTime(timezone=True),

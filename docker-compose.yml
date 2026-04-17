@@ -83,8 +83,9 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./db:/db
     command: >
-      sh -c "alembic upgrade head &&
+      sh -c "alembic -c /db/alembic.ini upgrade head &&
              uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app"
 
   # ── Next.js Frontend ───────────────────────────────────────────────────────

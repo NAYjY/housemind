@@ -6,6 +6,64 @@ A collaborative annotation workspace where architects, contractors, homeowners, 
 
 ---
 
+## Problem
+
+🛠 Project Onboarding & Migration Error Report
+1. PostgreSQL Enum Conflicts (Double-Creation)
+The Problem: The backend would crash with sqlalchemy.exc.ProgrammingError: type "user_role" already exists.
+
+The Cause: "Double ownership." Both the Alembic migration and the SQLAlchemy models were trying to create the same Enum types in the database.
+
+The Fix: * Set create_type=False in the SQLAlchemy Enum definitions within the Python models.
+
+Used postgresql.ENUM(name="...", create_type=False) inside the Alembic op.create_table commands to ensure it only references the existing type created at the top of the script.
+
+2. Non-Transactional Index Errors
+The Problem: Migration 003 failed with ActiveSQLTransactionError: CREATE INDEX CONCURRENTLY cannot run inside a transaction block.
+
+The Cause: Postgres prevents "Concurrent" index building inside a standard BEGIN/COMMIT block because it requires two table scans. Alembic wraps all migrations in a transaction by default.
+
+The Fix: Removed the CONCURRENTLY keyword from the migration. For local development with empty tables, the performance benefit is zero, and it allows the migration to run safely within the standard transaction.
+
+3. FastAPI Route Validation (HTTP 204)
+The Problem: Backend startup crashed with AssertionError: Status code 204 must not have a response body.
+
+The Cause: The DELETE endpoint was set to status_code=204, but the function was returning data (the result of the delete logic). HTTP 204 is strictly "No Content."
+
+The Fix: Modified the endpoint to return Response(status_code=status.HTTP_204_NO_CONTENT) or simply return None to ensure no body is sent.
+
+4. Python Syntax Rules (__future__)
+The Problem: SyntaxError: from __future__ imports must occur at the beginning of the file.
+
+The Cause: In auth.py, code or stray characters (accidental pastes) were placed above the from __future__ import annotations line.
+
+The Fix: Moved the __future__ import to the absolute first line of the file (line 1).
+
+5. Makefile Environment Mismatch
+The Problem: make db-migrate and make db-seed failed with Error 127: alembic/python not found.
+
+The Cause: The Makefile was written to execute commands on the host machine, but the required tools were only installed inside the Docker containers.
+
+The Fix: Commands must be executed via docker compose exec backend <command>.
+
+Recommendation: Update the Makefile to wrap these commands in docker compose exec so they are portable for all developers.
+
+6. Frontend Routing (404 on Root)
+The Problem: Navigating to http://localhost:3000 returned a 404.
+
+The Cause: The project used a nested dynamic directory structure (/workspace/[projectId]/[imageId]) but lacked a root page.tsx in the app/ directory.
+
+The Fix: Created a basic app/page.tsx to serve as a landing page/entry point for the application.
+
+🚀 Final System Status
+Database: Schema version 003_composite_indexes is active.
+
+Backend: Uvicorn is running, and Swagger documentation is available at /docs.
+
+Frontend: Next.js is serving pages, and dynamic routing is functional.
+
+Summary Note: The system is now stable. Future developers should ensure they have the postgresql.dialects import in their migrations and avoid running host-level Python commands if they are strictly using the Docker environment.
+---
 ## Prerequisites
 
 | Tool | Version | Notes |

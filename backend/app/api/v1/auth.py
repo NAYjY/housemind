@@ -1,4 +1,3 @@
-import os
 """
 app/api/v1/auth.py — HouseMind
 Magic-link invite flow: generate token → email → redeem → JWT issued.
@@ -12,6 +11,8 @@ Flow:
               (user record created on first redemption if not already exists)
 """
 from __future__ import annotations
+
+import os
 
 import secrets
 import uuid

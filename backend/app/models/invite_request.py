@@ -14,7 +14,7 @@ from .base import Base
 
 INVITE_STATUS = Enum(
     "pending", "accepted", "expired", "revoked",
-    name="invite_status",
+    name="invite_status",create_type=False
 )
 
 

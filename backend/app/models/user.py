@@ -14,7 +14,7 @@ from .base import Base
 
 USER_ROLE = Enum(
     "architect", "contractor", "homeowner", "supplier",
-    name="user_role",
+    name="user_role",create_type=False
 )
 
 
