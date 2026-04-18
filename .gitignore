@@ -24,3 +24,5 @@
 *.swo
 *.swn
 *.pyc
+/.next
+frontend/.next

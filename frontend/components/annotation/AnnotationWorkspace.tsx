@@ -1,58 +1,30 @@
 "use client";
 
-/**
- * components/annotation/AnnotationWorkspace.tsx — HouseMind
- * Luxury burnished-bronze theme.
- * Filmstrip tray replaces plain upload bar.
- * Role-aware, i18n-ready, ARIA labelled.
- */
+// components/annotation/AnnotationWorkspace.tsx — HouseMind
+// Senior-grade: role-aware, responsive (desktop panel + mobile sheet), ARIA.
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useAnnotationStore } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
 import { AnnotationCanvas } from "./AnnotationCanvas";
 import { ProductDetailPanel } from "./ProductDetailPanel";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 
-interface AnnotationWorkspaceProps {
+interface Props {
   imageId: string;
   imageUrl: string;
   projectId: string;
   forceReadOnly?: boolean;
 }
 
-/* ── Luxury tokens (inline — consumed by non-global elements) ── */
-const T = {
-  hero:        "#1C1810",
-  heroText:    "#F2EDE0",
-  accentMid:   "#C49A3C",
-  accentDark:  "#5C420E",
-  accentLight: "#F5EDD8",
-  accentText:  "#4A3408",
-  bg:          "#FAF8F4",
-  bg2:         "#F2EFE8",
-  border:      "#E0DAD0",
-  text:        "#1C1810",
-  textMuted:   "#7A7060",
-  textHint:    "#B0A898",
-  successBg:   "#EAF0DE",
-  successText: "#3A5010",
-} as const;
-
-export function AnnotationWorkspace({
-  imageId,
-  imageUrl,
-  projectId,
-  forceReadOnly = false,
-}: AnnotationWorkspaceProps) {
-  const auth        = useAuth();
+export function AnnotationWorkspace({ imageId, imageUrl, projectId, forceReadOnly = false }: Props) {
+  const auth = useAuth();
   const activePinId = useAnnotationStore((s) => s.activePinId);
   const setActivePin = useAnnotationStore((s) => s.setActivePin);
-  const annotations  = useAnnotationStore((s) => s.annotationsByImage[imageId] ?? []);
+  const annotations = useAnnotationStore((s) => s.annotationsByImage[imageId] ?? []);
 
-  const readOnly         = forceReadOnly || auth.isReadOnly;
+  const readOnly = forceReadOnly || auth.isReadOnly;
   const activeAnnotation = activePinId ? annotations.find((a) => a.id === activePinId) ?? null : null;
-
   const handleClosePanel = useCallback(() => setActivePin(null), [setActivePin]);
 
   const panel = activeAnnotation ? (
@@ -67,119 +39,76 @@ export function AnnotationWorkspace({
   );
 
   return (
-    <div
-      data-testid="annotation-workspace"
-      style={{
-        display: "flex",
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        background: T.bg,
-      }}
-    >
-      {/* ── Canvas column ── */}
-      <div style={{ flex: 1, minWidth: 0, position: "relative", height: "100%" }}>
-        <AnnotationCanvas
-          imageId={imageId}
-          imageUrl={imageUrl}
-          projectId={projectId}
-          readOnly={readOnly}
-        />
-        {readOnly && (
-          <div
-            aria-label="Read-only mode"
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
-              background: "rgba(28,24,16,0.6)",
-              color: T.heroText,
-              fontSize: 10,
-              fontWeight: 500,
-              padding: "4px 10px",
-              borderRadius: 20,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              backdropFilter: "blur(6px)",
-              pointerEvents: "none",
-              zIndex: 10,
-            }}
-          >
-            {auth.role?.toUpperCase() ?? "READ ONLY"}
-          </div>
-        )}
-      </div>
+    <>
+      <style>{`
+        .hm-workspace { display: flex; width: 100%; height: 100%; position: relative; overflow: hidden; background: var(--color-surface-muted); }
+        .hm-canvas-col { flex: 1; min-width: 0; position: relative; height: 100%; }
+        .hm-side-panel { display: none; width: 340px; flex-shrink: 0; height: 100%; border-left: 0.5px solid var(--color-border); background: var(--color-surface); flex-direction: column; overflow: hidden; }
+        .hm-bottom-sheet-wrap { display: block; }
+        @media (min-width: 768px) {
+          .hm-side-panel { display: flex; }
+          .hm-bottom-sheet-wrap { display: none; }
+        }
+      `}</style>
 
-      {/* ── Desktop side panel ── */}
-      <div
-        className="hm-desktop-panel"
-        style={{
-          width: 360,
-          flexShrink: 0,
-          height: "100%",
-          borderLeft: `0.5px solid ${T.border}`,
-          background: T.bg,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* Desktop panel header */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: `0.5px solid ${T.border}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: T.hero,
-          }}
-        >
-          <div>
-            <span
+      <div data-testid="annotation-workspace" className="hm-workspace">
+        {/* Canvas */}
+        <div className="hm-canvas-col">
+          <AnnotationCanvas
+            imageId={imageId}
+            imageUrl={imageUrl}
+            projectId={projectId}
+            readOnly={readOnly}
+          />
+
+          {/* Role badge */}
+          {readOnly && (
+            <div
+              aria-label="Read-only mode"
               style={{
-                fontFamily: "'DM Serif Display', serif",
-                fontSize: 20,
-                color: T.heroText,
-                letterSpacing: "-0.01em",
+                position: "absolute", top: 12, right: 12,
+                background: "rgba(0,0,0,0.55)", color: "#fff",
+                fontSize: 11, fontWeight: 600,
+                padding: "4px 10px", borderRadius: 20,
+                letterSpacing: "0.04em",
+                backdropFilter: "blur(8px)",
+                pointerEvents: "none", zIndex: 10,
               }}
             >
-              House<span style={{ color: T.accentMid }}>Mind</span>
-            </span>
-          </div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 500,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              padding: "4px 10px",
-              borderRadius: 20,
-              border: "0.5px solid rgba(255,255,255,0.18)",
-              color: "rgba(255,255,255,0.55)",
-            }}
-          >
-            {auth.role ?? "Viewer"}
-          </div>
+              {auth.role?.toUpperCase() ?? "READ ONLY"}
+            </div>
+          )}
+
+          {/* Tap hint */}
+          {!readOnly && annotations.length === 0 && (
+            <div style={{
+              position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)",
+              background: "rgba(0,0,0,0.6)", color: "#fff",
+              fontSize: 12, padding: "8px 16px", borderRadius: 20,
+              backdropFilter: "blur(8px)", pointerEvents: "none", zIndex: 10,
+              whiteSpace: "nowrap",
+            }}>
+              แตะบนรูปเพื่อเพิ่มหมายเหตุ · Tap to annotate
+            </div>
+          )}
         </div>
-        {panel}
+
+        {/* Desktop side panel */}
+        <div className="hm-side-panel">{panel}</div>
+
+        {/* Mobile bottom sheet */}
+        <div className="hm-bottom-sheet-wrap">
+          <BottomSheet isOpen snapPoints={[0.22, 0.55, 0.88]} initialSnap={0}>
+            {panel}
+          </BottomSheet>
+        </div>
       </div>
-
-      {/* ── Mobile bottom sheet ── */}
-      <BottomSheet isOpen snapPoints={[0.25, 0.55, 0.88]} initialSnap={0}>
-        {panel}
-      </BottomSheet>
-
-      <style>{`
-        @media (min-width: 768px) { .hm-desktop-panel { display: flex !important; } }
-        @media (max-width: 767px) { .hm-desktop-panel { display: none !important; } }
-      `}</style>
-    </div>
+    </>
   );
 }
 
-/* ── Annotation list panel ── */
+// ── Annotation list ───────────────────────────────────────────────────────────
+
 function AnnotationListPanel({
   annotations,
   onSelectPin,
@@ -187,78 +116,77 @@ function AnnotationListPanel({
   annotations: Array<{ id: string; resolved_at: string | null; linked_product_id: string | null }>;
   onSelectPin: (id: string) => void;
 }) {
-  const open     = annotations.filter((a) => !a.resolved_at);
+  const open = annotations.filter((a) => !a.resolved_at);
   const resolved = annotations.filter((a) => a.resolved_at);
 
-  if (annotations.length === 0) {
-    return (
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          color: T.textHint,
-          fontSize: 13,
-          gap: 10,
-          padding: 28,
-          textAlign: "center",
-        }}
-      >
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <circle cx="16" cy="16" r="15" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
-          <path d="M16 10v6M16 20v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-        <span style={{ color: T.textMuted }}>แตะบนรูปภาพเพื่อเพิ่มหมายเหตุ</span>
-        <span style={{ fontSize: 11, opacity: 0.6 }}>Tap the image to add an annotation</span>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: "12px 0" }}>
-      {open.length > 0 && <SectionLabel text={`Open · ${open.length}`} />}
-      {open.map((ann, i) => (
-        <AnnotationRow key={ann.id} index={i} annotation={ann} onClick={() => onSelectPin(ann.id)} />
-      ))}
-      {resolved.length > 0 && <SectionLabel text={`Resolved · ${resolved.length}`} muted />}
-      {resolved.map((ann, i) => (
-        <AnnotationRow
-          key={ann.id}
-          index={open.length + i}
-          annotation={ann}
-          onClick={() => onSelectPin(ann.id)}
-          resolved
-        />
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header */}
+      <div style={{
+        padding: "16px 16px 12px",
+        borderBottom: "0.5px solid var(--color-border)",
+        flexShrink: 0,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)" }}>
+          หมายเหตุทั้งหมด
+        </div>
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
+          {open.length} รอดำเนินการ · {resolved.length} แก้ไขแล้ว
+        </div>
+      </div>
+
+      {/* List */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {annotations.length === 0 ? (
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            justifyContent: "center", height: "100%",
+            color: "var(--color-text-muted)", fontSize: 13,
+            gap: 10, padding: 32, textAlign: "center",
+          }}>
+            <div style={{ fontSize: 36 }}>📌</div>
+            <div style={{ fontWeight: 500 }}>ยังไม่มีหมายเหตุ</div>
+            <div style={{ fontSize: 11, opacity: 0.6 }}>Tap the image to add an annotation</div>
+          </div>
+        ) : (
+          <>
+            {open.length > 0 && (
+              <>
+                <SectionLabel text={`Open · ${open.length}`} />
+                {open.map((ann, i) => (
+                  <AnnotationRow key={ann.id} index={i} annotation={ann} onClick={() => onSelectPin(ann.id)} />
+                ))}
+              </>
+            )}
+            {resolved.length > 0 && (
+              <>
+                <SectionLabel text={`Resolved · ${resolved.length}`} muted />
+                {resolved.map((ann, i) => (
+                  <AnnotationRow key={ann.id} index={open.length + i} annotation={ann} onClick={() => onSelectPin(ann.id)} resolved />
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 function SectionLabel({ text, muted = false }: { text: string; muted?: boolean }) {
   return (
-    <div
-      style={{
-        fontSize: 10,
-        fontWeight: 500,
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        color: T.textHint,
-        padding: "8px 20px 4px",
-        opacity: muted ? 0.55 : 1,
-      }}
-    >
+    <div style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+      textTransform: "uppercase", color: "var(--color-text-muted)",
+      padding: "10px 16px 4px", opacity: muted ? 0.55 : 1,
+    }}>
       {text}
     </div>
   );
 }
 
 function AnnotationRow({
-  index,
-  annotation,
-  onClick,
-  resolved = false,
+  index, annotation, onClick, resolved = false,
 }: {
   index: number;
   annotation: { id: string; linked_product_id: string | null };
@@ -270,49 +198,36 @@ function AnnotationRow({
       data-testid={`annotation-row-${annotation.id}`}
       onClick={onClick}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        width: "100%",
-        padding: "11px 20px",
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        textAlign: "left",
-        borderBottom: `0.5px solid ${T.border}`,
+        display: "flex", alignItems: "center", gap: 12,
+        width: "100%", padding: "11px 16px",
+        background: "none", border: "none", cursor: "pointer",
+        textAlign: "left", borderBottom: "0.5px solid var(--color-border)",
         opacity: resolved ? 0.5 : 1,
-        transition: "background 0.15s",
+        transition: "background 0.12s",
       }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = T.bg2)}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "none")}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-surface-muted)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
     >
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: resolved ? T.border : T.accentLight,
-          color: resolved ? T.textHint : T.accentDark,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          fontWeight: 500,
-          flexShrink: 0,
-        }}
-      >
-        {index + 1}
+      <div style={{
+        width: 30, height: 30, borderRadius: "50%",
+        background: resolved ? "var(--color-border)" : "var(--color-accent-light)",
+        color: resolved ? "var(--color-text-muted)" : "var(--color-accent)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 12, fontWeight: 700, flexShrink: 0,
+      }}>
+        {resolved ? "✓" : index + 1}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: T.text }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>
           หมายเหตุ #{index + 1}
         </div>
-        <div style={{ fontSize: 11, color: T.textHint, marginTop: 2 }}>
-          {resolved ? "✓ แก้ไขแล้ว" : "รอดำเนินการ"}
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1 }}>
+          {resolved ? "แก้ไขแล้ว · Resolved" : "รอดำเนินการ · Open"}
+          {annotation.linked_product_id && " · 🔗 สินค้า"}
         </div>
       </div>
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
-        <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.3 }}>
+        <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
   );

@@ -11,6 +11,12 @@ const nextConfig = {
         protocol: "https",
         hostname: "s3.ap-southeast-1.amazonaws.com",
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
     unoptimized: false,
     formats: ["image/avif", "image/webp"],
