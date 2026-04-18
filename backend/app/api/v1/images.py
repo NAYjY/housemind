@@ -1,29 +1,31 @@
 """
 app/api/v1/images.py — HouseMind
-Project image endpoints: S3 URL refresh + upload presign + confirm.
+Project image endpoints.
+
+Changes vs original:
+  - Added GET /images?project_id=<uuid>  → list all images for a project (carousel).
+    Merges figmaTem GET /carousel_images/<project_id>.
+  - Added DELETE /images/{image_id}       → soft-delete image + cascade to annotations.
+    Was missing despite soft_delete_image() helper existing in db/queries.py.
 
 URL contract:
-  GET  /api/v1/images/{image_id}/url    → refresh pre-signed GET URL (called on S3 403)
-  POST /api/v1/images/upload-url        → get presigned PUT URL for direct upload
-  POST /api/v1/images/confirm           → confirm upload succeeded; creates DB record
-
-The upload flow is two-step (BLK-9 fix):
-  1. Client calls POST /upload-url → receives presigned PUT URL + s3_key
-  2. Client uploads file directly to S3 (PUT to presigned URL)
-  3. Client calls POST /confirm → DB record created ONLY on confirmed upload
-
-This guarantees S3 and DB are never out of sync in the write direction.
+  GET    /api/v1/images?project_id=<uuid>   → list (all roles)
+  GET    /api/v1/images/{image_id}/url      → refresh presigned URL (all roles)
+  POST   /api/v1/images/upload-url          → get presigned PUT URL (architect + owner)
+  POST   /api/v1/images/confirm             → confirm upload, create DB record (architect + owner)
+  DELETE /api/v1/images/{image_id}          → soft-delete + cascade (architect + owner)
 """
 from __future__ import annotations
 
 import uuid
 from pathlib import PurePosixPath
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import require_project_member, require_project_owner
-from app.db.queries import get_active_image
+from app.config import settings
+from app.db.queries import get_active_image, list_active_images, soft_delete_image
 from app.db.session import get_db
 from app.models.project_image import ProjectImage
 from app.schemas.annotation import (
@@ -33,7 +35,6 @@ from app.schemas.annotation import (
     UploadPresignRequest,
     UploadPresignResponse,
 )
-from app.config import settings
 from app.services.s3 import (
     make_project_image_key,
     presign_project_image,
@@ -41,6 +42,46 @@ from app.services.s3 import (
 )
 
 router = APIRouter(prefix="/images", tags=["images"])
+
+
+# ── GET /images?project_id=<uuid> ─────────────────────────────────────────────
+
+@router.get("", response_model=list[ProjectImageResponse])
+async def list_project_images(
+    project_id: uuid.UUID = Query(..., description="Project ID to fetch images for"),
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(require_project_member),
+) -> list[ProjectImageResponse]:
+    """
+    List all non-deleted images for a project, ordered for carousel display.
+    Merges figmaTem GET /carousel_images/<project_id>.
+    Each image includes a fresh pre-signed GET URL (900 s expiry).
+    Frontend should set React Query staleTime ≤ 600 000 ms (10 min).
+    """
+    images = await list_active_images(db, project_id)
+
+    result = []
+    for image in images:
+        try:
+            url = presign_project_image(image.s3_key)
+        except RuntimeError:
+            url = ""  # non-fatal; UI shows placeholder
+
+        result.append(
+            ProjectImageResponse(
+                id=image.id,
+                project_id=image.project_id,
+                s3_key=image.s3_key,
+                original_filename=image.original_filename,
+                mime_type=image.mime_type,
+                width_px=image.width_px,
+                height_px=image.height_px,
+                display_order=image.display_order,
+                created_at=image.created_at,
+                url=url,
+            )
+        )
+    return result
 
 
 # ── GET /images/{image_id}/url ────────────────────────────────────────────────
@@ -54,9 +95,6 @@ async def refresh_image_url(
     """
     Called by Frontend when a project image URL returns 403 (expired presigned URL).
     Returns a fresh 15-minute presigned GET URL.
-
-    Frontend distinguishes S3 403 (no error_code field) from API 403
-    (has error_code: "ACCESS_DENIED") — see error contract in Backend agent output.
     """
     image = await get_active_image(db, image_id)
     if not image:
@@ -78,12 +116,7 @@ async def get_upload_url(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ) -> UploadPresignResponse:
-    """
-    Step 1 of image upload: return a presigned S3 PUT URL.
-    The DB record is NOT created here — only after /confirm is called.
-
-    Client must PUT the file to upload_url with the correct Content-Type header.
-    """
+    """Step 1 of image upload: return a presigned S3 PUT URL."""
     ext = PurePosixPath(body.filename).suffix.lstrip(".").lower() or "jpg"
     image_id = uuid.uuid4()
     s3_key = make_project_image_key(str(body.project_id), str(image_id), ext)
@@ -104,12 +137,7 @@ async def confirm_upload(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ) -> ProjectImageResponse:
-    """
-    Step 2 of image upload: client confirms S3 upload succeeded.
-    ProjectImage DB record is created HERE — not before upload is confirmed.
-
-    This guarantees the DB never references an S3 object that failed to upload.
-    """
+    """Step 2 of image upload: confirm S3 upload, create DB record."""
     image = ProjectImage(
         id=uuid.uuid4(),
         project_id=body.project_id,
@@ -133,4 +161,28 @@ async def confirm_upload(
         height_px=image.height_px,
         display_order=image.display_order,
         created_at=image.created_at,
+        url=None,  # client already has the S3 URL from the confirm response
     )
+
+
+# ── DELETE /images/{image_id} ─────────────────────────────────────────────────
+
+@router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_image(
+    image_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_project_owner),
+):
+    """
+    Soft-delete a project image and cascade soft-delete to all its annotations.
+    DB records are retained; deleted_at is set on both the image and its annotations.
+    The S3 object is NOT deleted here — add a separate S3 lifecycle rule or
+    a scheduled cleanup job to reclaim storage.
+    """
+    image = await soft_delete_image(db, image_id)
+    if image is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found or already deleted",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

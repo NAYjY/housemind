@@ -1,0 +1,176 @@
+===================================================================
+HouseMind Backend — Changes from figmaTem Flask → FastAPI merge
+===================================================================
+
+ANALYSIS: What figmaTem (Flask) had that HouseMind (FastAPI) was missing
+=========================================================================
+
+1. PROJECT IMAGES — carousel / multi-image per project
+   figmaTem: GET /carousel_images/<project_id>  (imgRef.py + project.py)
+   Gap: HouseMind /images/* only handled single-image upload/confirm/refresh.
+         No endpoint to LIST all images for a project (needed for carousel).
+   Fix: Added GET /api/v1/images?project_id=<uuid> → list_project_images()
+
+2. PROJECT HIERARCHY — parent / sub-project tree
+   figmaTem: Projects had ParentProjectID (project.py: create_sub, project_view)
+             GET /<project_id> returned parent_name + subprojects[]
+             GET /user/<auth_id> returned top-level projects only
+   Gap: HouseMind Project model had no parent_id; no sub-project endpoints.
+   Fix:
+     - Added parent_project_id nullable FK to Project model
+     - Added GET  /api/v1/projects                    → list user's top-level projects
+     - Added GET  /api/v1/projects/{project_id}       → project detail + subprojects[]
+     - Added POST /api/v1/projects                    → create top-level project
+     - Added POST /api/v1/projects/{project_id}/sub   → create subproject
+
+3. ANNOTATION MOVE (coordinate update)
+   figmaTem: POST /annotations/move/<annotation_id>  {x, y}
+   Gap: HouseMind had no PATCH for updating annotation position after placement.
+   Fix: Added PATCH /api/v1/annotations/{annotation_id}/move  {position_x, position_y}
+        Uses same normalised float [0.0, 1.0] coordinate system.
+        Role gate: architect (project owner) only — same as create/delete.
+
+4. PRODUCT SCRAPING — URL → images extraction
+   figmaTem: GET /products/get-images?url=<url>  (BeautifulSoup scraper)
+   Gap: HouseMind had no product image scraping endpoint.
+   Fix: Added GET /api/v1/products/scrape-images?url=<url>
+        - Async httpx instead of sync requests
+        - Same BeautifulSoup logic with og:image / twitter:image fallback
+        - Content-type sniff for direct image URLs
+        - Role gate: architect only (prevents open scrape proxy abuse)
+        - Timeout 8s, max 20 images returned
+
+5. PRODUCT CATALOGUE — add / delete from project
+   figmaTem: POST /products/add, DELETE /products/delete/<id>/<project_id>
+             GET  /products/get/<project_id>
+   Gap: HouseMind only had GET /products/{id} (single lazy-load on tap).
+         No endpoint to attach/detach a product to/from a project annotation,
+         no endpoint to list all products used in a project.
+   Fix: Added GET  /api/v1/products?project_id=<uuid>  → project product list
+        (leverages existing list_active_annotations_for_project query + join)
+        Product attach/detach is handled via annotation.linked_product_id —
+        use existing PATCH /annotations/{id}/move body extended with
+        linked_product_id field (see AnnotationUpdateRequest schema).
+
+6. S3 SINGLETON BUG — infinite recursion in s3.py
+   figmaTem: n/a (used local file storage)
+   Gap: _get_s3_client_cached() called itself recursively → stack overflow on
+         first S3 operation in production.
+   Fix: Fixed to properly assign module-level _s3_client on first call.
+
+7. AUTH — missing imports in legacy auth.py
+   figmaTem auth.py referenced uuid, time, get_db_connection without imports.
+   Gap: Not merged (legacy Flask file kept as reference only).
+         HouseMind auth.py is complete and correct.
+
+8. SOFT-DELETE CASCADE consistency
+   figmaTem: Hard DELETE on annotations (DELETE FROM ImageAnnotations).
+   HouseMind: Soft delete via deleted_at — preserved and enforced.
+   No change needed; HouseMind pattern is correct.
+
+9. PROJECT IMAGE DELETE endpoint
+   figmaTem: No explicit image delete (images were permanent once uploaded).
+   Gap: HouseMind had no DELETE /images/{image_id} endpoint despite the
+         soft_delete_image() helper existing in db/queries.py.
+   Fix: Added DELETE /api/v1/images/{image_id} → soft-delete image + cascade
+        Role gate: architect (project owner) only.
+
+10. main.py — missing router registration
+    HouseMind main.py was not included in the provided files.
+    Fix: Created complete main.py with all middleware, routers, lifespan.
+
+===================================================================
+NEW / CHANGED FILES (relative to backend/)
+===================================================================
+
+NEW FILES:
+  app/api/v1/projects.py          ← project CRUD + sub-project tree
+  main.py                         ← app entry point (was absent)
+
+CHANGED FILES:
+  app/models/project.py           ← added parent_project_id FK + relationship
+  app/schemas/annotation.py       ← added AnnotationUpdateRequest (move + link product)
+  app/schemas/project.py          ← NEW schema file for project request/response
+  app/api/v1/annotations.py       ← added PATCH /{id}/move endpoint
+  app/api/v1/images.py            ← added GET ?project_id + DELETE /{id}
+  app/api/v1/products.py          ← added GET ?project_id + GET /scrape-images
+  app/api/v1/__init__.py          ← added projects_router
+  app/services/s3.py              ← fixed infinite recursion bug in _get_s3_client_cached
+  app/db/queries.py               ← added list_active_images_for_project helper
+
+===================================================================
+API CONTRACT ADDITIONS (new endpoints)
+===================================================================
+
+GET  /api/v1/projects
+  Auth: Bearer (any role)
+  Query: none (returns projects for the JWT user)
+  Response: ProjectListItem[]
+  Notes: architects see projects they own; others see projects they're invited to
+         (invite join not yet implemented — phase 2; currently returns owned only)
+
+GET  /api/v1/projects/{project_id}
+  Auth: Bearer (any role)
+  Response: ProjectDetail { ...project, subprojects: ProjectListItem[] }
+
+POST /api/v1/projects
+  Auth: Bearer (architect only)
+  Body: { name: str, description?: str }
+  Response: 201 ProjectDetail
+  Notes: creates top-level project (parent_project_id = null)
+
+POST /api/v1/projects/{project_id}/sub
+  Auth: Bearer (architect + project owner)
+  Body: { name: str, description?: str }
+  Response: 201 ProjectDetail
+
+GET  /api/v1/images?project_id=<uuid>
+  Auth: Bearer (any role)
+  Response: ProjectImageResponse[] (ordered by display_order, created_at)
+  Notes: returns pre-signed GET URLs for each image (900s expiry)
+
+DELETE /api/v1/images/{image_id}
+  Auth: Bearer (architect + project owner)
+  Response: 204 No Content
+  Notes: soft-delete; cascades to annotations on that image
+
+PATCH /api/v1/annotations/{annotation_id}/move
+  Auth: Bearer (architect + project owner)
+  Body: { position_x: float [0,1], position_y: float [0,1], linked_product_id?: uuid }
+  Response: 200 AnnotationSummary
+  Notes: updates pin position and/or linked product in one call
+
+GET  /api/v1/products?project_id=<uuid>
+  Auth: Bearer (any role)
+  Response: ProductDetail[] (products linked to annotations in this project)
+  Notes: uses list_active_annotations_for_project join — no N+1
+
+GET  /api/v1/products/scrape-images?url=<url>
+  Auth: Bearer (architect only)
+  Response: { images: str[] }
+  Notes: async scraper; max 20 results; 8s timeout; og:image fallback
+  Errors: 400 if url missing, 502 if fetch fails, 404 if no images found
+
+===================================================================
+INDEXES TO ADD (flag for DB engineer)
+===================================================================
+
+  projects: INDEX (parent_project_id)   ← needed for subproject tree query
+  projects: INDEX (architect_id, status) ← already exists per auth.py comment;
+                                           confirm it covers (architect_id) alone too
+  annotations: INDEX (linked_product_id) ← already in model; confirm migration ran
+
+===================================================================
+SECURITY FLAGS
+===================================================================
+
+  /products/scrape-images — SSRF risk mitigated by:
+    - Architect-only role gate (not open to homeowners/contractors)
+    - 8s hard timeout
+    - No internal network IPs (add allowlist/blocklist in production phase)
+    - Recommend: add IP allowlist blocking 169.254.x.x, 10.x, 172.16-31.x in prod
+
+  JWT tokens in tests — conftest.py uses base64 decode of JWT payload which
+    relies on test SECRET_KEY being HS256; ensure prod SECRET_KEY ≥ 64 bytes
+
+===================================================================

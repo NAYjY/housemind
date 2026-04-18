@@ -2,27 +2,28 @@
 app/api/v1/annotations.py — HouseMind
 CRUD endpoints for annotations on project images.
 
-URL contract (matches Frontend hooks/useAnnotations.ts after BLK-2 fix):
-  GET    /api/v1/annotations?image_id=<uuid>        → list (read: all roles)
-  POST   /api/v1/annotations                        → create (architect + project owner)
-  DELETE /api/v1/annotations/{annotation_id}        → soft-delete (architect + project owner)
-  PATCH  /api/v1/annotations/{annotation_id}/resolve   → resolve thread (architect or contractor)
-  PATCH  /api/v1/annotations/{annotation_id}/reopen    → reopen thread (architect or contractor)
+Changes vs original:
+  - Added PATCH /{annotation_id}/move  → update pin coordinates + linked product.
+    Merges figmaTem POST /annotations/move/<id> {x, y} into normalised coordinates.
 
-Concurrency policy: LAST-WRITE-WINS (explicitly acknowledged).
-If the product requires optimistic locking in future, add a `version INTEGER`
-column to annotations and return HTTP 409 on stale update.
+URL contract:
+  GET    /api/v1/annotations?image_id=<uuid>            → list (all roles)
+  POST   /api/v1/annotations                            → create (architect + project owner)
+  DELETE /api/v1/annotations/{annotation_id}            → soft-delete (architect + owner)
+  PATCH  /api/v1/annotations/{annotation_id}/move       → move pin / link product (architect + owner)
+  PATCH  /api/v1/annotations/{annotation_id}/resolve    → resolve thread (architect or contractor)
+  PATCH  /api/v1/annotations/{annotation_id}/reopen     → reopen thread (architect or contractor)
 """
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import require_project_member, require_project_owner, require_architect_or_contractor
+from app.auth import require_architect_or_contractor, require_project_member, require_project_owner
 from app.db.queries import (
     get_active_annotation,
     list_active_annotations_for_image,
@@ -34,6 +35,7 @@ from app.models.product import Product
 from app.schemas.annotation import (
     AnnotationDetail,
     AnnotationSummary,
+    AnnotationUpdateRequest,
     CreateAnnotationRequest,
     ResolveAnnotationRequest,
 )
@@ -43,16 +45,12 @@ router = APIRouter(prefix="/annotations", tags=["annotations"])
 
 
 def _sign_annotation(ann: Annotation) -> AnnotationSummary:
-    """
-    Map ORM row → AnnotationSummary, pre-signing the thumbnail URL.
-    If the annotation has no linked product, thumbnail_url is empty string.
-    """
     thumbnail_url = ""
     if ann.linked_product_id and hasattr(ann, "_product_s3_key") and ann._product_s3_key:
         try:
             thumbnail_url = presign_product_thumbnail(ann._product_s3_key)
         except RuntimeError:
-            thumbnail_url = ""  # non-fatal — UI shows placeholder
+            thumbnail_url = ""
 
     return AnnotationSummary(
         id=ann.id,
@@ -72,31 +70,22 @@ def _sign_annotation(ann: Annotation) -> AnnotationSummary:
 
 @router.get("", response_model=list[AnnotationSummary])
 async def list_annotations(
-    image_id: uuid.UUID = Query(..., description="ID of the project image"),
+    image_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
     _user: dict = Depends(require_project_member),
 ) -> list[AnnotationSummary]:
-    """
-    Lightweight annotation list for page load.
-    Joins to products to get thumbnail S3 key in one query (no N+1).
-    Full product detail (name, price, specs) is fetched separately on pin tap.
-    """
     annotations = await list_active_annotations_for_image(db, image_id)
 
-    # Batch-fetch product thumbnail keys to avoid N+1
     product_ids = [a.linked_product_id for a in annotations if a.linked_product_id]
     product_keys: dict[uuid.UUID, str] = {}
     if product_ids:
         result = await db.execute(
-            select(Product.id, Product.thumbnail_s3_key).where(
-                Product.id.in_(product_ids)
-            )
+            select(Product.id, Product.thumbnail_s3_key).where(Product.id.in_(product_ids))
         )
         product_keys = {row.id: row.thumbnail_s3_key for row in result}
 
     summaries = []
     for ann in annotations:
-        # Attach the S3 key as a transient attribute for _sign_annotation
         ann._product_s3_key = product_keys.get(ann.linked_product_id, "")  # type: ignore[attr-defined]
         summaries.append(_sign_annotation(ann))
 
@@ -111,12 +100,6 @@ async def create_annotation(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ) -> AnnotationSummary:
-    """
-    Create a new annotation pin.
-    Only architects who own the project can create annotations.
-
-    Concurrency: last-write-wins. Two simultaneous creates produce two pins.
-    """
     ann = Annotation(
         id=uuid.uuid4(),
         image_id=body.image_id,
@@ -130,7 +113,6 @@ async def create_annotation(
     db.add(ann)
     await db.flush()
 
-    # Fetch thumbnail for response
     thumbnail_url = ""
     if ann.linked_product_id:
         result = await db.execute(
@@ -157,6 +139,62 @@ async def create_annotation(
     )
 
 
+# ── PATCH /annotations/{annotation_id}/move ──────────────────────────────────
+
+@router.patch("/{annotation_id}/move", response_model=AnnotationSummary)
+async def move_annotation(
+    annotation_id: uuid.UUID,
+    body: AnnotationUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_project_owner),
+) -> AnnotationSummary:
+    """
+    Update annotation pin position and/or linked product.
+    Merges figmaTem's POST /annotations/move/<id> {x, y} into normalised coordinates.
+    All fields are optional — send only what changed.
+    position_x / position_y must be in [0.0, 1.0] (normalised, not pixels).
+    """
+    ann = await get_active_annotation(db, annotation_id)
+    if ann is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
+
+    if body.position_x is not None:
+        ann.position_x = body.position_x
+    if body.position_y is not None:
+        ann.position_y = body.position_y
+    if body.unlink_product:
+        ann.linked_product_id = None
+    elif body.linked_product_id is not None:
+        ann.linked_product_id = body.linked_product_id
+
+    await db.flush()
+
+    thumbnail_url = ""
+    if ann.linked_product_id:
+        result = await db.execute(
+            select(Product.thumbnail_s3_key).where(Product.id == ann.linked_product_id)
+        )
+        s3_key = result.scalar_one_or_none()
+        if s3_key:
+            try:
+                thumbnail_url = presign_product_thumbnail(s3_key)
+            except RuntimeError:
+                pass
+
+    return AnnotationSummary(
+        id=ann.id,
+        image_id=ann.image_id,
+        linked_product_id=ann.linked_product_id,
+        thumbnail_url=thumbnail_url,
+        position_x=ann.position_x,
+        position_y=ann.position_y,
+        created_by=ann.created_by,
+        created_at=ann.created_at,
+        resolved_at=ann.resolved_at,
+        resolved_by=ann.resolved_by,
+    )
+
+
 # ── DELETE /annotations/{annotation_id} ──────────────────────────────────────
 
 @router.delete("/{annotation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -165,16 +203,9 @@ async def delete_annotation(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ):
-    """
-    Soft-delete an annotation. DB record is retained; deleted_at is set.
-    Only architects who own the parent project can delete.
-    """
     ann = await soft_delete_annotation(db, annotation_id)
     if ann is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Annotation not found or already deleted",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found or already deleted")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -187,10 +218,6 @@ async def resolve_annotation(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_architect_or_contractor),
 ) -> AnnotationDetail:
-    """
-    Mark an annotation thread as resolved.
-    Role gate: Architect or Contractor only (spec requirement).
-    """
     ann = await get_active_annotation(db, annotation_id)
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
@@ -228,10 +255,6 @@ async def reopen_annotation(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_architect_or_contractor),
 ) -> AnnotationDetail:
-    """
-    Reopen a previously resolved annotation thread.
-    Role gate: Architect or Contractor only.
-    """
     ann = await get_active_annotation(db, annotation_id)
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")

@@ -1,13 +1,17 @@
-// components/layout/BottomSheet.tsx
 "use client";
+
+/**
+ * components/layout/BottomSheet.tsx — HouseMind
+ * Luxury burnished-bronze bottom sheet.
+ */
 
 import { useRef, useState, useCallback, useEffect } from "react";
 
 interface BottomSheetProps {
   children: React.ReactNode;
   isOpen: boolean;
-  snapPoints?: number[]; // e.g. [0.25, 0.6, 0.92] — fraction of viewport height
-  initialSnap?: number; // index into snapPoints
+  snapPoints?: number[];
+  initialSnap?: number;
   onClose?: () => void;
 }
 
@@ -19,56 +23,43 @@ export function BottomSheet({
   snapPoints = DEFAULT_SNAPS,
   initialSnap = 0,
 }: BottomSheetProps) {
-  const [snapIdx, setSnapIdx] = useState(initialSnap);
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const dragStartY = useRef<number | null>(null);
-  const startHeightFrac = useRef<number>(snapPoints[initialSnap]);
-  const [dragging, setDragging] = useState(false);
+  const [snapIdx, setSnapIdx]       = useState(initialSnap);
+  const sheetRef                    = useRef<HTMLDivElement>(null);
+  const dragStartY                  = useRef<number | null>(null);
+  const startHeightFrac             = useRef<number>(snapPoints[initialSnap]);
+  const [dragging, setDragging]     = useState(false);
   const [currentFrac, setCurrentFrac] = useState(snapPoints[initialSnap]);
 
-  useEffect(() => {
-    setCurrentFrac(snapPoints[snapIdx]);
-  }, [snapIdx, snapPoints]);
+  useEffect(() => { setCurrentFrac(snapPoints[snapIdx]); }, [snapIdx, snapPoints]);
 
-  const handleDragStart = useCallback(
-    (e: React.TouchEvent | React.MouseEvent) => {
-      const y = "touches" in e ? e.touches[0].clientY : e.clientY;
-      dragStartY.current = y;
-      startHeightFrac.current = currentFrac;
-      setDragging(true);
-    },
-    [currentFrac]
-  );
+  const handleDragStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    const y = "touches" in e ? e.touches[0].clientY : e.clientY;
+    dragStartY.current    = y;
+    startHeightFrac.current = currentFrac;
+    setDragging(true);
+  }, [currentFrac]);
 
-  const handleDragMove = useCallback(
-    (e: React.TouchEvent | React.MouseEvent) => {
-      if (dragStartY.current === null) return;
-      const y = "touches" in e ? e.touches[0].clientY : e.clientY;
-      const vh = window.innerHeight;
-      const delta = (dragStartY.current - y) / vh;
-      const newFrac = Math.max(
-        snapPoints[0] * 0.5,
-        Math.min(snapPoints[snapPoints.length - 1], startHeightFrac.current + delta)
-      );
-      setCurrentFrac(newFrac);
-    },
-    [snapPoints]
-  );
+  const handleDragMove = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (dragStartY.current === null) return;
+    const y   = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const vh  = window.innerHeight;
+    const delta = (dragStartY.current - y) / vh;
+    const newFrac = Math.max(
+      snapPoints[0] * 0.5,
+      Math.min(snapPoints[snapPoints.length - 1], startHeightFrac.current + delta)
+    );
+    setCurrentFrac(newFrac);
+  }, [snapPoints]);
 
   const handleDragEnd = useCallback(() => {
     if (!dragging) return;
     setDragging(false);
     dragStartY.current = null;
-
-    // Snap to nearest point
     let nearest = 0;
     let minDist = Infinity;
     snapPoints.forEach((snap, i) => {
       const dist = Math.abs(snap - currentFrac);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = i;
-      }
+      if (dist < minDist) { minDist = dist; nearest = i; }
     });
     setSnapIdx(nearest);
     setCurrentFrac(snapPoints[nearest]);
@@ -78,13 +69,12 @@ export function BottomSheet({
 
   return (
     <>
-      {/* Backdrop */}
       {isOpen && currentFrac > 0.55 && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: `rgba(0,0,0,${(currentFrac - 0.55) * 1.5})`,
+            background: `rgba(28,24,16,${(currentFrac - 0.55) * 1.4})`,
             zIndex: 39,
             pointerEvents: "none",
             transition: dragging ? "none" : "background 0.2s",
@@ -92,19 +82,16 @@ export function BottomSheet({
         />
       )}
 
-      {/* Sheet */}
       <div
         ref={sheetRef}
         style={{
           position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
+          left: 0, right: 0, bottom: 0,
           height: isOpen ? heightPct : "0px",
           zIndex: 40,
-          background: "var(--color-surface)",
-          borderRadius: "20px 20px 0 0",
-          boxShadow: "0 -4px 32px rgba(0,0,0,0.18)",
+          background: "#FAF8F4",
+          borderRadius: "18px 18px 0 0",
+          boxShadow: "0 -4px 32px rgba(28,24,16,0.14)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -131,15 +118,14 @@ export function BottomSheet({
         >
           <div
             style={{
-              width: 40,
-              height: 4,
+              width: 36,
+              height: 3,
               borderRadius: 2,
-              background: "var(--color-border)",
+              background: "#E0DAD0",
             }}
           />
         </div>
 
-        {/* Content */}
         <div style={{ flex: 1, overflowY: "auto" }}>{children}</div>
       </div>
     </>

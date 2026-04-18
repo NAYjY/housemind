@@ -1,5 +1,9 @@
-// components/annotation/AnnotationPin.tsx
 "use client";
+
+/**
+ * components/annotation/AnnotationPin.tsx — HouseMind
+ * Luxury burnished-bronze pin style.
+ */
 
 import { Annotation } from "@/store/annotationStore";
 import { useAnnotationStore } from "@/store/annotationStore";
@@ -11,17 +15,18 @@ interface AnnotationPinProps {
   index: number;
 }
 
-/**
- * Renders an annotation pin at normalized (positionX, positionY) coordinates.
- * positionX/positionY are floats 0.0–1.0 — we convert to % for CSS positioning.
- * No pixel math in the rendering layer.
- */
+const T = {
+  accent:      "#8B6520",
+  accentMid:   "#C49A3C",
+  accentLight: "#F5EDD8",
+  accentDark:  "#5C420E",
+} as const;
+
 export function AnnotationPin({ annotation, isActive, index }: AnnotationPinProps) {
   const setActivePin = useAnnotationStore((s) => s.setActivePin);
 
-  // Convert normalized floats → CSS percentages
   const left = `${annotation.position_x * 100}%`;
-  const top = `${annotation.position_y * 100}%`;
+  const top  = `${annotation.position_y * 100}%`;
 
   return (
     <div
@@ -35,32 +40,24 @@ export function AnnotationPin({ annotation, isActive, index }: AnnotationPinProp
         top,
         transform: "translate(-50%, -100%)",
         zIndex: isActive ? 30 : 20,
-        pointerEvents: "none", // parent canvas handles all touch
-        opacity: annotation.resolved_at ? 0.5 : 1,
+        pointerEvents: "none",
+        opacity: annotation.resolved_at ? 0.45 : 1,
         transition: "opacity 0.2s",
       }}
     >
-      {/* Pin bubble */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {/* Pin bubble */}
         <div
           style={{
-            width: isActive ? 52 : 44,
-            height: isActive ? 52 : 44,
+            width: isActive ? 50 : 42,
+            height: isActive ? 50 : 42,
             borderRadius: "50% 50% 50% 0",
             transform: "rotate(-45deg)",
-            background: isActive
-              ? "var(--color-accent)"
-              : "rgba(255,255,255,0.95)",
+            background: isActive ? T.accent : "rgba(255,255,255,0.96)",
             boxShadow: isActive
-              ? "0 4px 20px rgba(0,0,0,0.35)"
+              ? `0 4px 20px rgba(139,101,32,0.45)`
               : "0 2px 10px rgba(0,0,0,0.2)",
-            border: `2.5px solid ${isActive ? "white" : "var(--color-accent)"}`,
+            border: `2.5px solid ${isActive ? T.accentMid : T.accent}`,
             transition: "all 0.18s ease",
             overflow: "hidden",
             display: "flex",
@@ -68,7 +65,15 @@ export function AnnotationPin({ annotation, isActive, index }: AnnotationPinProp
             justifyContent: "center",
           }}
         >
-          <div style={{ transform: "rotate(45deg)", borderRadius: "50%", overflow: "hidden", width: "80%", height: "80%" }}>
+          <div
+            style={{
+              transform: "rotate(45deg)",
+              borderRadius: "50%",
+              overflow: "hidden",
+              width: "80%",
+              height: "80%",
+            }}
+          >
             {annotation.thumbnail_url ? (
               <Image
                 src={annotation.thumbnail_url}
@@ -82,13 +87,14 @@ export function AnnotationPin({ annotation, isActive, index }: AnnotationPinProp
                 style={{
                   width: "100%",
                   height: "100%",
-                  background: "var(--color-accent)",
+                  background: isActive ? T.accentMid : T.accentLight,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "white",
-                  fontSize: 14,
-                  fontWeight: 700,
+                  color: isActive ? "#fff" : T.accentDark,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  fontFamily: "'DM Serif Display', serif",
                 }}
               >
                 {index + 1}
@@ -101,10 +107,10 @@ export function AnnotationPin({ annotation, isActive, index }: AnnotationPinProp
         <div
           style={{
             width: 2,
-            height: 10,
-            background: isActive ? "var(--color-accent)" : "rgba(255,255,255,0.9)",
+            height: 9,
+            background: isActive ? T.accent : "rgba(255,255,255,0.85)",
             marginTop: -1,
-            boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.18)",
           }}
         />
       </div>

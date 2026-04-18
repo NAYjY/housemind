@@ -1,8 +1,12 @@
 """
 app/models/project.py — HouseMind
 Building projects owned by an architect.
-Soft-delete via status='archived' rather than a deleted_at column.
-Hard DELETE is never used on projects.
+
+Changes vs original:
+  - Added parent_project_id nullable FK (self-referential) for sub-project tree.
+    figmaTem had ParentProjectID on the Projects table; this merges that pattern.
+  - Added subprojects relationship.
+  - Soft-delete via status='archived' (unchanged).
 """
 from __future__ import annotations
 
@@ -16,7 +20,7 @@ from .base import Base
 
 PROJECT_STATUS = Enum(
     "draft", "active", "completed", "archived",
-    name="project_status",create_type=False
+    name="project_status", create_type=False
 )
 
 
@@ -31,6 +35,17 @@ class Project(Base):
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+    )
+    # -----------------------------------------------------------------------
+    # PARENT PROJECT — nullable; NULL means top-level project.
+    # Mirrors figmaTem's ParentProjectID column.
+    # -----------------------------------------------------------------------
+    parent_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=True,
+        default=None,
+        index=True,   # ← DB engineer: ensure ix_projects_parent_project_id exists
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -50,6 +65,13 @@ class Project(Base):
     )
     project_images: Mapped[list["ProjectImage"]] = relationship(  # type: ignore[name-defined]
         "ProjectImage", back_populates="project"
+    )
+    # Self-referential: one project → many subprojects
+    subprojects: Mapped[list["Project"]] = relationship(
+        "Project",
+        backref="parent",
+        remote_side=[id],
+        foreign_keys=[parent_project_id],
     )
 
     @property
