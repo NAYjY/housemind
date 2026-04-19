@@ -1,18 +1,26 @@
 "use client";
 
 // components/workspace/WorkspaceShell.tsx
-// Fixed interactions:
-//   - Desktop left-click on empty canvas → create pin
-//   - Desktop right-click on empty canvas → create pin (no context menu)  
-//   - Mobile tap on empty canvas → create pin
-//   - Mobile long-press on pin → delete
-//   - Desktop hover on pin → shows delete on right-click
-//   - Canvas overlay z-index no longer blocks pins (pins are above overlay)
+// Fixes applied:
+//   - Loads images from DB via useProjectImages on mount
+//   - Guards canvas mutations with auth.isAuthenticated (no redirect if not logged in)
+//   - File upload persists to DB via presign → S3 → confirm flow
+//   - URL paste remains session-only (clearly labelled)
 
-import { useState, useRef, useCallback } from "react";
-import { useAnnotations, useCreateAnnotation, useDeleteAnnotation, useResolveAnnotation, useReopenAnnotation, useProductDetail } from "@/hooks/useAnnotations";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useAnnotations,
+  useCreateAnnotation,
+  useDeleteAnnotation,
+  useResolveAnnotation,
+  useReopenAnnotation,
+  useProductDetail,
+} from "@/hooks/useAnnotations";
 import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectImages } from "@/hooks/useProjectImages";
+import { authFetch } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -30,29 +38,53 @@ const PIN_COLORS = ["#7F77DD", "#C9A84C", "#639922", "#E24B4A", "#888780", "#534
 export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: Props) {
   const auth = useAuth();
   const readOnly = forceReadOnly || auth.isReadOnly;
+  const qc = useQueryClient();
 
+  // ── Slides state (seeded from DB, falls back to URL param) ──────────────
   const [slides, setSlides] = useState<Slide[]>([
     { imageId, url: imageUrl, label: "Reference 1" },
   ]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const activeSlide = slides[currentSlide];
+  const seededFromDb = useRef(false);
 
-  const [filmExpanded, setFilmExpanded] = useState(false);
-  const [refInput, setRefInput] = useState("");
+  const { data: dbImages, refetch: refetchImages } = useProjectImages(projectId);
+
+  useEffect(() => {
+    if (seededFromDb.current) return;
+    if (!dbImages || dbImages.length === 0) return;
+    seededFromDb.current = true;
+    const dbSlides: Slide[] = dbImages.map((img, i) => ({
+      imageId: img.id,
+      url: img.url ?? "",
+      label: img.original_filename ?? `Reference ${i + 1}`,
+    }));
+    setSlides(dbSlides);
+    const idx = dbSlides.findIndex((s) => s.imageId === imageId);
+    setCurrentSlide(idx >= 0 ? idx : 0);
+  }, [dbImages, imageId]);
+
+  // ── UI state ─────────────────────────────────────────────────────────────
+  const [filmExpanded, setFilmExpanded]       = useState(false);
+  const [refInput, setRefInput]               = useState("");
+  const [uploading, setUploading]             = useState(false);
+  const [uploadError, setUploadError]         = useState("");
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Annotations ───────────────────────────────────────────────────────────
   useAnnotations(activeSlide.imageId);
-  const annotations = useAnnotationStore((s) => s.annotationsByImage[activeSlide.imageId] ?? []);
-  const createMutation = useCreateAnnotation(activeSlide.imageId);
+  const annotations   = useAnnotationStore((s) => s.annotationsByImage[activeSlide.imageId] ?? []);
+  const createMutation = useCreateAnnotation(activeSlide.imageId, projectId);
   const deleteMutation = useDeleteAnnotation(activeSlide.imageId);
 
   const activeAnnotation = activeAnnotationId
     ? annotations.find((a) => a.id === activeAnnotationId) ?? null
     : null;
 
+  // ── Canvas helpers ────────────────────────────────────────────────────────
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Shared: convert client coords → normalized 0–1
   const toNorm = useCallback((clientX: number, clientY: number) => {
     const el = canvasRef.current;
     if (!el) return null;
@@ -63,33 +95,88 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     };
   }, []);
 
-  const createAt = useCallback((clientX: number, clientY: number) => {
-    if (readOnly) return;
-    const norm = toNorm(clientX, clientY);
-    if (!norm) return;
-    createMutation.mutate({ positionX: norm.x, positionY: norm.y });
-  }, [readOnly, toNorm, createMutation]);
+  // Guard: only call mutation when authenticated to prevent 401 redirect
+  const createAt = useCallback(
+    (clientX: number, clientY: number) => {
+      if (readOnly) return;
+      if (!auth.isAuthenticated) return;
+      const norm = toNorm(clientX, clientY);
+      if (!norm) return;
+      createMutation.mutate({ positionX: norm.x, positionY: norm.y });
+    },
+    [readOnly, auth.isAuthenticated, toNorm, createMutation],
+  );
 
-  // Click on canvas background (not on a pin)
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only fire if the click target is the canvas itself (not a pin bubbling up)
     if (e.target !== e.currentTarget) return;
     if (activeAnnotationId) { setActiveAnnotationId(null); return; }
     createAt(e.clientX, e.clientY);
   };
 
-  // Right-click → create (suppress context menu)
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.target !== e.currentTarget) return;
     createAt(e.clientX, e.clientY);
   };
 
+  // ── Image upload — presign → S3 PUT → confirm ─────────────────────────────
+  const handleFileUpload = async (file: File) => {
+    if (!auth.isAuthenticated) {
+      setUploadError("Sign in to upload images.");
+      return;
+    }
+    setUploading(true);
+    setUploadError("");
+    try {
+      // Step 1: get presigned PUT URL from backend
+      const presignRes = await authFetch(`${API}/images/upload-url`, {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: projectId,
+          filename: file.name,
+          content_type: file.type,
+        }),
+      });
+      if (!presignRes.ok) throw new Error("Could not get upload URL");
+      const { upload_url, s3_key } = await presignRes.json();
+
+      // Step 2: PUT file directly to S3
+      const s3Res = await fetch(upload_url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!s3Res.ok) throw new Error("S3 upload failed");
+
+      // Step 3: confirm with backend so DB record is created
+      const confirmRes = await authFetch(`${API}/images/confirm`, {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: projectId,
+          s3_key,
+          original_filename: file.name,
+          mime_type: file.type,
+        }),
+      });
+      if (!confirmRes.ok) throw new Error("Upload confirmation failed");
+
+      // Refresh slide list from DB
+      seededFromDb.current = false;
+      await refetchImages();
+      setFilmExpanded(false);
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Session-only URL paste (no DB, disappears on refresh — shown in UI)
   const submitRef = () => {
     const url = refInput.trim();
     if (!url) return;
     const idx = slides.length;
-    setSlides((prev) => [...prev, { imageId: `local-${idx}`, url, label: `Reference ${idx + 1}` }]);
+    setSlides((prev) => [...prev, { imageId: `local-${idx}`, url, label: `Reference ${idx + 1} (session)` }]);
     setCurrentSlide(idx);
     setRefInput("");
     setFilmExpanded(false);
@@ -116,14 +203,9 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         .hm-add-btn { height:28px; padding:0 12px; background:var(--stone-900); color:#fff; border:none; border-radius:20px; font-family:'DM Sans',sans-serif; font-size:10px; font-weight:500; letter-spacing:0.06em; cursor:pointer; transition:background 0.15s; }
         .hm-add-btn:hover { background:var(--accent); }
 
-        /* Canvas — key fix: position:relative, no pointer-events blocking */
         .hm-canvas-wrap { position:relative; width:100%; aspect-ratio:1/1; overflow:hidden; background:var(--stone-200); user-select:none; -webkit-user-select:none; }
         .hm-canvas-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; pointer-events:none; }
-
-        /* Tap/click zone — sits BELOW pins (z-index:5) */
         .hm-canvas-tap { position:absolute; inset:0; z-index:5; cursor:crosshair; }
-
-        /* Pins sit ABOVE tap zone (z-index:10+) */
         .hm-pin { position:absolute; transform:translate(-50%,-100%); z-index:15; cursor:pointer; }
         .hm-pin-bubble { width:32px; height:32px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 3px 12px rgba(0,0,0,0.25); font-size:11px; font-weight:600; color:#fff; transition:width 0.15s,height 0.15s; }
         .hm-pin-bubble.active { width:38px; height:38px; }
@@ -135,7 +217,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
         .hm-filmstrip { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.62); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-top:0.5px solid rgba(255,255,255,0.07); z-index:25; transition:height 0.28s cubic-bezier(0.32,0.72,0,1); overflow:hidden; }
         .hm-filmstrip.collapsed { height:68px; }
-        .hm-filmstrip.expanded { height:124px; }
+        .hm-filmstrip.expanded { height:160px; }
         .hm-tray-row { display:flex; align-items:center; gap:8px; padding:11px 12px; overflow-x:auto; scrollbar-width:none; }
         .hm-tray-row::-webkit-scrollbar { display:none; }
         .hm-film-thumb { flex-shrink:0; width:46px; height:46px; border-radius:7px; border:1.5px solid transparent; background:rgba(255,255,255,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; position:relative; overflow:hidden; transition:border-color 0.15s,background 0.15s; font-family:'DM Serif Display',serif; font-size:15px; color:rgba(255,255,255,0.5); }
@@ -147,13 +229,19 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         .hm-film-add-icon { font-size:15px; color:rgba(255,255,255,0.45); line-height:1; }
         .hm-film-add-label { font-size:8px; letter-spacing:0.06em; text-transform:uppercase; color:rgba(255,255,255,0.3); }
         .hm-tray-hint { font-size:10px; color:rgba(255,255,255,0.2); letter-spacing:0.06em; text-transform:uppercase; white-space:nowrap; flex-shrink:0; padding-left:4px; }
-        .hm-tray-input-row { display:flex; gap:8px; padding:0 12px 10px; animation:hm-fade-slide 0.2s ease; }
+        .hm-tray-upload-row { display:flex; flex-direction:column; gap:6px; padding:0 12px 10px; animation:hm-fade-slide 0.2s ease; }
+        .hm-tray-input-row { display:flex; gap:8px; }
         @keyframes hm-fade-slide { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
         .hm-tray-input { flex:1; height:36px; background:rgba(255,255,255,0.1); border:0.5px solid rgba(255,255,255,0.18); border-radius:8px; padding:0 12px; font-family:'DM Sans',sans-serif; font-size:12px; color:#fff; outline:none; }
         .hm-tray-input::placeholder { color:rgba(255,255,255,0.3); }
         .hm-tray-input:focus { border-color:var(--gold); }
         .hm-tray-submit { height:36px; padding:0 14px; background:var(--gold); border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:500; color:#3A2E10; cursor:pointer; white-space:nowrap; }
+        .hm-tray-submit:disabled { opacity:0.5; cursor:wait; }
+        .hm-tray-file-btn { height:36px; padding:0 14px; background:rgba(255,255,255,0.12); border:0.5px solid rgba(255,255,255,0.22); border-radius:8px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:500; color:rgba(255,255,255,0.75); cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:5px; }
+        .hm-tray-file-btn:hover { background:rgba(255,255,255,0.18); }
         .hm-tray-close { height:36px; width:36px; flex-shrink:0; background:rgba(255,255,255,0.07); border:0.5px solid rgba(255,255,255,0.14); border-radius:8px; color:rgba(255,255,255,0.45); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        .hm-upload-note { font-size:9px; color:rgba(255,255,255,0.25); letter-spacing:0.04em; padding:0 2px; }
+        .hm-upload-error { font-size:10px; color:#F87171; padding:2px 0; }
 
         .hm-canvas-hint { position:absolute; bottom:80px; left:50%; transform:translateX(-50%); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.35); font-family:'DM Serif Display',serif; pointer-events:none; white-space:nowrap; z-index:6; }
         .hm-creating { position:absolute; inset:0; z-index:30; background:rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; pointer-events:none; }
@@ -198,6 +286,19 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         .hm-no-auth { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--stone-900); color:#fff; font-size:12px; padding:10px 18px; border-radius:20px; display:flex; align-items:center; gap:10px; z-index:300; box-shadow:0 4px 20px rgba(0,0,0,0.3); white-space:nowrap; }
         .hm-no-auth a { color:var(--gold); text-decoration:none; font-weight:500; }
       `}</style>
+
+      {/* Hidden file input — triggered by upload button */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileUpload(file);
+          e.target.value = ""; // reset so same file can be re-selected
+        }}
+      />
 
       <div className="hm-app">
         {/* Not logged in warning */}
@@ -255,7 +356,9 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           {/* Hint */}
           {annotations.length === 0 && !readOnly && (
             <div className="hm-canvas-hint">
-              {auth.isAuthenticated ? "Click or right-click to annotate" : "Sign in to annotate"}
+              {auth.isAuthenticated
+                ? "Click to annotate"
+                : "Sign in to annotate"}
             </div>
           )}
 
@@ -267,7 +370,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
             onDelete={readOnly ? undefined : (id) => deleteMutation.mutate(id)}
           />
 
-          {createMutation.isPending && (
+          {(createMutation.isPending || uploading) && (
             <div className="hm-creating"><div className="spinner" /></div>
           )}
 
@@ -293,24 +396,40 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
                   <span className="hm-slide-num">img</span>
                 </div>
               ))}
-              <button className="hm-film-add" onClick={() => setFilmExpanded(true)}>
+              <button className="hm-film-add" onClick={() => setFilmExpanded((v) => !v)}>
                 <span className="hm-film-add-icon">+</span>
-                <span className="hm-film-add-label">Ref</span>
+                <span className="hm-film-add-label">Add</span>
               </button>
               <span className="hm-tray-hint">Filmstrip</span>
             </div>
+
             {filmExpanded && (
-              <div className="hm-tray-input-row">
-                <input
-                  className="hm-tray-input"
-                  placeholder="Paste image URL…"
-                  value={refInput}
-                  onChange={(e) => setRefInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitRef()}
-                  autoFocus
-                />
-                <button className="hm-tray-submit" onClick={submitRef}>Upload</button>
-                <button className="hm-tray-close" onClick={() => { setFilmExpanded(false); setRefInput(""); }}>×</button>
+              <div className="hm-tray-upload-row">
+                {/* Row 1: file upload (persists to DB) + close */}
+                <div className="hm-tray-input-row">
+                  <button
+                    className="hm-tray-file-btn"
+                    disabled={uploading || !auth.isAuthenticated}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    📁 {uploading ? "Uploading…" : "Upload image"}
+                  </button>
+                  <div style={{ flex: 1 }} />
+                  <button className="hm-tray-close" onClick={() => { setFilmExpanded(false); setRefInput(""); setUploadError(""); }}>×</button>
+                </div>
+                {/* Row 2: URL paste (session-only) */}
+                <div className="hm-tray-input-row">
+                  <input
+                    className="hm-tray-input"
+                    placeholder="Or paste image URL (session only)…"
+                    value={refInput}
+                    onChange={(e) => setRefInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && submitRef()}
+                  />
+                  <button className="hm-tray-submit" onClick={submitRef}>Add</button>
+                </div>
+                {uploadError && <div className="hm-upload-error">⚠ {uploadError}</div>}
+                <div className="hm-upload-note">Uploaded files persist · Pasted URLs are session-only</div>
               </div>
             )}
           </div>
@@ -334,7 +453,9 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           ))}
           {annotations.length === 0 && (
             <div style={{ gridColumn: "1/-1", padding: "40px 0", textAlign: "center", color: "var(--stone-300)", fontFamily: "'DM Serif Display',serif", fontSize: 15 }}>
-              Click the canvas above to add annotations
+              {auth.isAuthenticated
+                ? "Click the canvas above to add annotations"
+                : "Sign in to add annotations"}
             </div>
           )}
         </div>
@@ -373,20 +494,13 @@ function PinsLayer({ annotations, activeId, onSelect, onDelete }: {
           key={ann.id}
           className="hm-pin"
           style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%` }}
-          // Desktop: click to select, right-click to delete
           onClick={(e) => { e.stopPropagation(); onSelect(ann.id); }}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onDelete?.(ann.id); }}
-          // Mobile: touch start → long press timer → delete
           onPointerDown={(e) => {
             e.stopPropagation();
-            timerRef.current[ann.id] = setTimeout(() => {
-              onDelete?.(ann.id);
-            }, 600);
+            timerRef.current[ann.id] = setTimeout(() => { onDelete?.(ann.id); }, 600);
           }}
-          onPointerUp={(e) => {
-            e.stopPropagation();
-            clearTimeout(timerRef.current[ann.id]);
-          }}
+          onPointerUp={(e) => { e.stopPropagation(); clearTimeout(timerRef.current[ann.id]); }}
           onPointerLeave={() => clearTimeout(timerRef.current[ann.id])}
         >
           <div className={`hm-pin-bubble ${isActive ? "active" : ""}`} style={{ background: color }}>
@@ -399,7 +513,7 @@ function PinsLayer({ annotations, activeId, onSelect, onDelete }: {
   </>;
 }
 
-// ── Product card ──────────────────────────────────────────────────────────────
+// ── Annotation card ───────────────────────────────────────────────────────────
 
 const LETTERS = "MFBCAVDKSPRTZWQJYING";
 
@@ -439,7 +553,7 @@ function DetailPanel({ annotation, canResolve, imageId, onClose }: {
 }) {
   const { data: product, isLoading } = useProductDetail(annotation.linked_product_id);
   const resolveMutation = useResolveAnnotation(imageId);
-  const reopenMutation = useReopenAnnotation(imageId);
+  const reopenMutation  = useReopenAnnotation(imageId);
   const isResolved = !!annotation.resolved_at;
   const isBusy = resolveMutation.isPending || reopenMutation.isPending;
 
@@ -470,8 +584,12 @@ function DetailPanel({ annotation, canResolve, imageId, onClose }: {
       </div>
       <div className="hm-detail-body">
         <div className="hm-detail-name">{product?.name ?? `Pin #${annotation.id.slice(0, 6)}`}</div>
-        {product?.brand && <div className="hm-detail-brand">{product.brand}{product.model ? ` · ${product.model}` : ""}</div>}
-        {product?.price != null && <div className="hm-price-chip">฿ {product.price.toLocaleString("th-TH")}</div>}
+        {product?.brand && (
+          <div className="hm-detail-brand">{product.brand}{product.model ? ` · ${product.model}` : ""}</div>
+        )}
+        {product?.price != null && (
+          <div className="hm-price-chip">฿ {product.price.toLocaleString("th-TH")}</div>
+        )}
         <div className="hm-spec-label">Specifications</div>
         {SPECS.map((s) => (
           <div key={s.k} className="hm-spec-row">

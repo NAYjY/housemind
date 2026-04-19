@@ -15,7 +15,7 @@ const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export function useAnnotations(imageId: string) {
   const setAnnotations = useAnnotationStore((s) => s.setAnnotations);
-
+  const isRealId = !!imageId && !imageId.startsWith("local-");
   return useQuery({
     queryKey: ["annotations", imageId],
     queryFn: async () => {
@@ -25,11 +25,11 @@ export function useAnnotations(imageId: string) {
       setAnnotations(imageId, data);
       return data;
     },
-    enabled: !!imageId,
+    enabled: isRealId,
   });
 }
 
-export function useCreateAnnotation(imageId: string) {
+export function useCreateAnnotation(imageId: string, projectId: string) {
   const qc = useQueryClient();
   const addAnnotation = useAnnotationStore((s) => s.addAnnotation);
 
@@ -39,7 +39,8 @@ export function useCreateAnnotation(imageId: string) {
       positionY: number;
       linkedProductId?: string | null;
     }) => {
-      const res = await authFetch(`${API}/annotations`, {
+      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
+      const res = await authFetch(`${API}/annotations?project_id=${projectId}`, {
         method: "POST",
         body: JSON.stringify({
           image_id: imageId,
@@ -64,6 +65,7 @@ export function useDeleteAnnotation(imageId: string) {
 
   return useMutation({
     mutationFn: async (annotationId: string) => {
+      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
       const res = await authFetch(`${API}/annotations/${annotationId}`, {
         method: "DELETE",
       });
@@ -81,6 +83,7 @@ export function useResolveAnnotation(imageId: string) {
 
   return useMutation({
     mutationFn: async (annotationId: string) => {
+      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
       const res = await authFetch(`${API}/annotations/${annotationId}/resolve`, {
         method: "PATCH",
         body: JSON.stringify({}),
@@ -99,6 +102,7 @@ export function useReopenAnnotation(imageId: string) {
 
   return useMutation({
     mutationFn: async (annotationId: string) => {
+      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
       // body required — FastAPI rejects PATCH with no body when Content-Type is set
       const res = await authFetch(`${API}/annotations/${annotationId}/reopen`, {
         method: "PATCH",

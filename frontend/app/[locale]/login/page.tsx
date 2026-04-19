@@ -22,7 +22,7 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("architect@housemind.dev");
+  const [email, setEmail] = useState("architect@housemind.test");
   const [role, setRole] = useState<Role>("architect");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,8 +48,7 @@ export default function LoginPage() {
       setToken(data.access_token);
 
       // Redirect to workspace demo or home
-      router.push("/workspace/demo/demo-image?src=https://images.unsplash.com/photo-1555041469-a586c61ea9bc&readOnly=false");
-    } catch (err: unknown) {
+      router.push("/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001");    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);

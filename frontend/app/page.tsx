@@ -42,10 +42,10 @@ export default function LandingPage() {
             </div>
             {/* Link from i18n/routing — adds /th/ prefix automatically */}
             <Link
-              href="/workspace/demo/demo-image"
+              href="/login"
               className="hm-land-cta"
             >
-              Open Demo Workspace →
+              Sign In to Workspace →
             </Link>
           </div>
 
