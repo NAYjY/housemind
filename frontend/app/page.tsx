@@ -1,4 +1,8 @@
-// app/page.tsx — HouseMind landing page matching the reference design aesthetic
+// app/[locale]/page.tsx — HouseMind landing page
+// Uses Link from i18n/routing so locale prefix is added automatically.
+// /th/workspace/demo/... instead of hardcoded /workspace/demo/...
+
+import { Link } from "@/i18n/routing";
 
 export default function LandingPage() {
   return (
@@ -6,12 +10,12 @@ export default function LandingPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
         :root {
-          --stone-50:#FAFAF8;--stone-100:#F5F4F0;--stone-200:#E8E6E0;
-          --stone-300:#D4D1C7;--stone-500:#888780;--stone-900:#1A1A18;
-          --accent:#7F77DD;--gold:#C9A84C;--gold-light:#F5EDD4;
+          --stone-50:#FAFAF8; --stone-100:#F5F4F0; --stone-200:#E8E6E0;
+          --stone-300:#D4D1C7; --stone-500:#888780; --stone-900:#1A1A18;
+          --accent:#7F77DD; --gold:#C9A84C; --gold-light:#F5EDD4;
         }
         .hm-land { font-family:'DM Sans',sans-serif; background:#E8E6E0; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:32px 16px 64px; }
-        .hm-land-card { background:var(--stone-50); width:100%; max-width:430px; border-radius:0; box-shadow:0 8px 40px rgba(0,0,0,0.18); overflow:hidden; }
+        .hm-land-card { background:var(--stone-50); width:100%; max-width:430px; box-shadow:0 8px 40px rgba(0,0,0,0.18); overflow:hidden; }
         .hm-land-hero { background:var(--stone-900); padding:40px 28px 36px; }
         .hm-land-wordmark { font-family:'DM Serif Display',serif; font-size:38px; color:#fff; letter-spacing:-0.02em; line-height:1; margin-bottom:6px; }
         .hm-land-wordmark span { color:var(--gold); }
@@ -30,25 +34,27 @@ export default function LandingPage() {
 
       <div className="hm-land">
         <div className="hm-land-card">
-          {/* Dark hero */}
           <div className="hm-land-hero">
             <div className="hm-land-wordmark">House<span>Mind</span></div>
             <div className="hm-land-sub">Visual decisions workspace</div>
             <div className="hm-land-desc">
               แพลตฟอร์มสำหรับทีมก่อสร้าง — ทำหมายเหตุบนรูปภาพ เชื่อมโยงสินค้า และตัดสินใจร่วมกัน
             </div>
-            <a className="hm-land-cta" href="/workspace/demo/demo-image?src=https://images.unsplash.com/photo-1555041469-a586c61ea9bc&readOnly=false">
+            {/* Link from i18n/routing — adds /th/ prefix automatically */}
+            <Link
+              href="/workspace/demo/demo-image"
+              className="hm-land-cta"
+            >
               Open Demo Workspace →
-            </a>
+            </Link>
           </div>
 
-          {/* Feature grid */}
           <div className="hm-land-body">
             <div className="hm-land-features">
               {[
-                { icon: "📍", title: "Annotate", desc: "Tap any image to drop a pin" },
-                { icon: "🎞", title: "Filmstrip", desc: "Manage multiple reference images" },
-                { icon: "✅", title: "Resolve", desc: "Track decisions to completion" },
+                { icon: "📍", title: "Annotate",      desc: "Tap any image to drop a pin" },
+                { icon: "🎞", title: "Filmstrip",     desc: "Manage multiple reference images" },
+                { icon: "✅", title: "Resolve",       desc: "Track decisions to completion" },
                 { icon: "🔗", title: "Link Products", desc: "Attach specs and pricing" },
               ].map((f) => (
                 <div key={f.title} className="hm-land-feat">
@@ -66,6 +72,12 @@ export default function LandingPage() {
               {["Architect", "Contractor", "Homeowner", "Supplier"].map((r) => (
                 <span key={r} className="hm-land-role">{r}</span>
               ))}
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <Link href="/login" style={{ fontSize: 12, color: "var(--stone-500)", textDecoration: "none" }}>
+                Sign in →
+              </Link>
             </div>
           </div>
         </div>
