@@ -18,7 +18,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://localhost:8000/v1";
+const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://localhost:8000/api/v1";
 const ARCHITECT_TOKEN = process.env.TEST_ARCHITECT_TOKEN ?? "";
 const PROJECT_ID = process.env.TEST_PROJECT_ID ?? "";
 const IMAGE_ID = process.env.TEST_IMAGE_ID ?? "";

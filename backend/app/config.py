@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # set to "production" in prod
+    #SECRET_KEY: str = "dev-secret-change-in-production-please"
+    #ENVIRONMENT: str = "development"   # set to "production" in prod
+
     # ── Runtime environment ────────────────────────────────────────────────
     ENVIRONMENT: str = "local"
 

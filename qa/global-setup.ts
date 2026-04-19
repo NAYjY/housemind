@@ -12,7 +12,7 @@
 
 import { chromium, FullConfig } from "@playwright/test";
 
-const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://localhost:8000/v1";
+const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://localhost:8000/api/v1";
 const FRONTEND_BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 // Seed tokens created by db/seed.py — used to mint role-specific JWTs

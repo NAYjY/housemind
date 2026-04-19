@@ -25,7 +25,7 @@ const productDetailDuration  = new Trend("product_detail_duration", true);
 const errorRate              = new Rate("error_rate");
 
 // ── Config ───────────────────────────────────────────────────────────────────
-const API_BASE   = __ENV.API_BASE   || "http://localhost:8000/v1";
+const API_BASE   = __ENV.API_BASE   || "http://localhost:8000/api/v1";
 const JWT_TOKEN  = __ENV.JWT_TOKEN  || "";
 const IMAGE_ID   = __ENV.IMAGE_ID   || "";
 const PRODUCT_ID = __ENV.PRODUCT_ID || "";

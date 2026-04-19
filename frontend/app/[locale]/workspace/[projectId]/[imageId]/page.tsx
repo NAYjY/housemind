@@ -17,7 +17,7 @@ export default async function WorkspacePage({ params, searchParams }: Props) {
   const sp = await searchParams;
   const imageUrl = sp.src ?? "/placeholder-room.jpg";
   const forceReadOnly = sp.readOnly === "true";
-
+  
   return (
     <WorkspaceShell
       imageId={imageId}

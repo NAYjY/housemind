@@ -153,7 +153,7 @@ npm run dev
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | ✅ | Backend API base. Local: `http://localhost:8000/v1` |
+| `NEXT_PUBLIC_API_BASE_URL` | ✅ | Backend API base. Local: `http://localhost:8000/api/v1` |
 | `NEXT_PUBLIC_APP_ENV` | ✅ | `local` \| `staging` \| `production` |
 | `NEXT_PUBLIC_SENTRY_DSN` | ❌ | Frontend Sentry DSN (separate from backend). |
 

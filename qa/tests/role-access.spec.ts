@@ -19,7 +19,7 @@
 
 import { test, expect, type APIRequestContext } from "@playwright/test";
 
-const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://localhost:8000/v1";
+const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://localhost:8000/api/v1";
 const IMAGE_ID = process.env.TEST_IMAGE_ID ?? "";
 const PROJECT_ID = process.env.TEST_PROJECT_ID ?? "";
 
