@@ -1,9 +1,6 @@
-/**
- * app/workspace/[projectId]/[imageId]/page.tsx — HouseMind
- * Senior-grade: proper async params (Next 14), URL-based imageUrl, auth check.
- */
+// app/workspace/[projectId]/[imageId]/page.tsx
 import type { Metadata } from "next";
-import { AnnotationWorkspace } from "@/components/annotation/AnnotationWorkspace";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
 interface Props {
   params: Promise<{ projectId: string; imageId: string }>;
@@ -12,9 +9,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { projectId } = await params;
-  return {
-    title: `Workspace ${projectId} — HouseMind`,
-  };
+  return { title: `HouseMind · ${projectId}` };
 }
 
 export default async function WorkspacePage({ params, searchParams }: Props) {
@@ -24,13 +19,11 @@ export default async function WorkspacePage({ params, searchParams }: Props) {
   const forceReadOnly = sp.readOnly === "true";
 
   return (
-    <main style={{ width: "100%", height: "100dvh", overflow: "hidden" }}>
-      <AnnotationWorkspace
-        imageId={imageId}
-        imageUrl={imageUrl}
-        projectId={projectId}
-        forceReadOnly={forceReadOnly}
-      />
-    </main>
+    <WorkspaceShell
+      imageId={imageId}
+      imageUrl={imageUrl}
+      projectId={projectId}
+      forceReadOnly={forceReadOnly}
+    />
   );
 }
