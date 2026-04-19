@@ -22,6 +22,7 @@ from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel as PydanticBase
 
 from app.auth import require_project_member, require_project_owner
 from app.config import settings
@@ -107,7 +108,42 @@ async def refresh_image_url(
 
     return RefreshedImageUrl(image_id=image_id, url=url, expires_in=900)
 
+class UrlImageRequest(PydanticBase):
+    project_id: uuid.UUID
+    url: str
+    original_filename: str | None = None
 
+@router.post("/from-url", response_model=ProjectImageResponse, status_code=status.HTTP_201_CREATED)
+async def create_image_from_url(
+    body: UrlImageRequest,
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_project_owner),
+) -> ProjectImageResponse:
+    """Store an external URL as a project image (no S3 upload needed)."""
+    image = ProjectImage(
+        id=uuid.uuid4(),
+        project_id=body.project_id,
+        s3_key=body.url,          # store URL in s3_key field
+        s3_bucket="external",     # sentinel value
+        original_filename=body.original_filename or body.url[:80],
+        mime_type="image/jpeg",   # assumed for external URLs
+    )
+    db.add(image)
+    await db.flush()
+
+    return ProjectImageResponse(
+        id=image.id,
+        project_id=image.project_id,
+        s3_key=image.s3_key,
+        original_filename=image.original_filename,
+        mime_type=image.mime_type,
+        width_px=None,
+        height_px=None,
+        display_order=image.display_order,
+        created_at=image.created_at,
+        url=body.url,             # return URL directly
+    )
+    
 # ── POST /images/upload-url ───────────────────────────────────────────────────
 
 @router.post("/upload-url", response_model=UploadPresignResponse)

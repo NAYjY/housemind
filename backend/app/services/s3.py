@@ -44,7 +44,7 @@ _s3_client = None
 def _get_s3_client_cached():
     global _s3_client
     if _s3_client is None:
-        _s3_client = _get_s3_client_cached()
+        _s3_client = _get_s3_client()
     return _s3_client
 
 
@@ -55,6 +55,9 @@ def presign_product_thumbnail(s3_key: str) -> str:
     Return a pre-signed GET URL for a product thumbnail.
     Valid for 1 hour (3 600 s). Frontend staleTime should be ≤ 3 300 000 ms (55 min).
     """
+    # External URLs are stored directly in s3_key
+    if s3_key.startswith("http://") or s3_key.startswith("https://"):
+        return s3_key
     return _presign_get(s3_key, expiry=3600)
 
 
@@ -63,20 +66,30 @@ def presign_project_image(s3_key: str) -> str:
     Return a pre-signed GET URL for a project image.
     Valid for 15 minutes (900 s). Frontend staleTime should be ≤ 600 000 ms (10 min).
     """
+    # External URLs are stored directly in s3_key
+    if s3_key.startswith("http://") or s3_key.startswith("https://"):
+        return s3_key
+
     return _presign_get(s3_key, expiry=900)
 
+
+def _rewrite_for_browser(url: str) -> str:
+    if _os.getenv("ENVIRONMENT", "local") != "local":
+        return url
+    """Rewrite Docker-internal localstack hostname to localhost for browser access."""
+    return url.replace("http://localstack:", "http://localhost:").replace("https://localstack:", "http://localhost:")
 
 def _presign_get(s3_key: str, expiry: int) -> str:
     client = _get_s3_client_cached()
     try:
-        return client.generate_presigned_url(
+        url = client.generate_presigned_url(
             "get_object",
             Params={"Bucket": settings.S3_BUCKET_NAME, "Key": s3_key},
             ExpiresIn=expiry,
         )
+        return _rewrite_for_browser(url)
     except ClientError as exc:
         raise RuntimeError(f"S3 presign (GET) failed for key={s3_key!r}: {exc}") from exc
-
 
 # ── Pre-signed PUT URLs (upload) ─────────────────────────────────────────────
 
@@ -92,7 +105,7 @@ def presign_project_image_upload(s3_key: str, content_type: str) -> str:
     """
     client = _get_s3_client_cached()
     try:
-        return client.generate_presigned_url(
+        url = client.generate_presigned_url(
             "put_object",
             Params={
                 "Bucket": settings.S3_BUCKET_NAME,
@@ -101,6 +114,7 @@ def presign_project_image_upload(s3_key: str, content_type: str) -> str:
             },
             ExpiresIn=900,
         )
+        return _rewrite_for_browser(url)
     except ClientError as exc:
         raise RuntimeError(f"S3 presign (PUT) failed for key={s3_key!r}: {exc}") from exc
 
