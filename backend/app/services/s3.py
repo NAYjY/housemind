@@ -91,6 +91,23 @@ def _presign_get(s3_key: str, expiry: int) -> str:
     except ClientError as exc:
         raise RuntimeError(f"S3 presign (GET) failed for key={s3_key!r}: {exc}") from exc
 
+
+def presign_product_thumbnail_upload(s3_key: str, content_type: str) -> str:
+    """Presigned PUT URL for product thumbnail upload. Valid 15 min."""
+    client = _get_s3_client_cached()
+    try:
+        url = client.generate_presigned_url(
+            "put_object",
+            Params={
+                "Bucket": settings.S3_BUCKET_NAME,
+                "Key": s3_key,
+                "ContentType": content_type,
+            },
+            ExpiresIn=900,
+        )
+        return _rewrite_for_browser(url)
+    except ClientError as exc:
+        raise RuntimeError(f"S3 presign (PUT) failed for key={s3_key!r}: {exc}") from exc
 # ── Pre-signed PUT URLs (upload) ─────────────────────────────────────────────
 
 def presign_project_image_upload(s3_key: str, content_type: str) -> str:

@@ -2,232 +2,173 @@
 
 // components/annotation/ProductDetailPanel.tsx — HouseMind
 
-import Image from "next/image";
 import { type Annotation } from "@/store/annotationStore";
-import { useProductDetail, useResolveAnnotation, useReopenAnnotation } from "@/hooks/useAnnotations";
+import { useProjectProducts } from "@/hooks/useProducts";
+import { useResolveAnnotation, useReopenAnnotation } from "@/hooks/useAnnotations";
+
+// Object defs — keep in sync with WorkspaceShell
+const OBJECT_DEFS: Record<number, { emoji: string; label: string }> = {
+  101: { emoji: "😊", label: "Smile" },
+  102: { emoji: "⭐", label: "Star" },
+  103: { emoji: "❤️", label: "Heart" },
+  104: { emoji: "📷", label: "Camera" },
+  105: { emoji: "🌿", label: "Leaf" },
+  106: { emoji: "🗺️", label: "Map" },
+  107: { emoji: "💵", label: "Dollar" },
+  108: { emoji: "🏷️", label: "Tag" },
+};
 
 interface Props {
   annotation: Annotation;
-  onClose: () => void;
-  canResolve: boolean;
+  projectId: string;
   imageId: string;
+  canAttach: boolean;
+  canResolve: boolean;
+  onClose: () => void;
+  onAttachProduct: () => void;
 }
 
-export function ProductDetailPanel({ annotation, onClose, canResolve, imageId }: Props) {
-  const { data: product, isLoading, isError } = useProductDetail(annotation.linked_product_id);
+export function ProductDetailPanel({
+  annotation,
+  projectId,
+  imageId,
+  canAttach,
+  canResolve,
+  onClose,
+  onAttachProduct,
+}: Props) {
+  const { data: products = [], isLoading } = useProjectProducts(projectId);
   const resolveMutation = useResolveAnnotation(imageId);
   const reopenMutation = useReopenAnnotation(imageId);
   const isResolved = !!annotation.resolved_at;
   const isBusy = resolveMutation.isPending || reopenMutation.isPending;
+  const def = OBJECT_DEFS[annotation.object_id];
 
   return (
-    <div
-      data-testid="product-detail-panel"
-      role="region"
-      aria-label="Annotation detail"
-      style={{ display: "flex", flexDirection: "column", height: "100%" }}
-    >
+    <div style={{
+      position: "fixed", inset: 0, background: "#FAFAF8",
+      zIndex: 150, display: "flex", flexDirection: "column",
+      maxWidth: 430, margin: "0 auto",
+      animation: "hm-slide-up 0.22s cubic-bezier(0.32,0.72,0,1)",
+    }}>
       {/* Header */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 16px 12px",
-        borderBottom: "0.5px solid var(--color-border)",
-        flexShrink: 0,
+        padding: "16px 20px", borderBottom: "0.5px solid #E8E6E0",
+        display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
       }}>
         <div>
-          <div style={{
-            fontSize: 10, fontWeight: 700,
-            color: isResolved ? "var(--color-success)" : "var(--color-accent)",
-            textTransform: "uppercase", letterSpacing: "0.07em",
-            marginBottom: 2,
-          }}>
-            {isResolved ? "✓ แก้ไขแล้ว · Resolved" : "รายละเอียด · Details"}
+          <div style={{ fontSize: 22, marginBottom: 2 }}>{def?.emoji ?? "📍"}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18" }}>
+            {def?.label ?? "Annotation"}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
-            {product?.name ?? (isLoading ? "กำลังโหลด…" : "ไม่มีสินค้า")}
+          <div style={{ fontSize: 11, color: "#888" }}>
+            {Math.round(annotation.position_x * 100)}%, {Math.round(annotation.position_y * 100)}%
+            {isResolved && <span style={{ color: "#639922", marginLeft: 8 }}>✓ Resolved</span>}
           </div>
         </div>
-
         <button
-          data-testid="close-panel-btn"
           onClick={onClose}
-          aria-label="Close panel"
           style={{
             width: 32, height: 32, borderRadius: "50%",
-            background: "var(--color-surface-muted)",
-            border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
+            background: "#F5F4F0", border: "none", cursor: "pointer",
+            fontSize: 16, color: "#888",
           }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M1 1l10 10M11 1L1 11" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
+        >×</button>
       </div>
 
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        {isLoading && <Skeleton />}
-        {isError && <ErrorMsg />}
-        {!annotation.linked_product_id && !isLoading && <NoProduct />}
-        {product && (
-          <>
-            {/* Thumbnail */}
-            {product.thumbnail_url && (
+      {/* Product list */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: 10 }}>
+          Products in this project
+        </div>
+
+        {isLoading && <div style={{ padding: 20, textAlign: "center" }}><div className="spinner" /></div>}
+
+        {!isLoading && products.length === 0 && (
+          <div style={{ padding: "32px 0", textAlign: "center", color: "#bbb", fontSize: 13 }}>
+            No products yet
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {products.map((p) => (
+            <div key={p.id} style={{
+              display: "flex", gap: 12, alignItems: "center",
+              padding: "10px 12px", background: "#fff",
+              border: "0.5px solid #E8E6E0", borderRadius: 12,
+            }}>
               <div style={{
-                position: "relative", width: "100%", aspectRatio: "4/3",
-                borderRadius: 10, overflow: "hidden", marginBottom: 16,
-                background: "var(--color-surface-muted)",
+                width: 52, height: 52, borderRadius: 8, overflow: "hidden",
+                background: "#F5F4F0", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <Image
-                  src={product.thumbnail_url}
-                  alt={product.name}
-                  fill
-                  style={{ objectFit: "cover" }}
-                  sizes="(max-width: 768px) 100vw, 340px"
-                />
+                {p.thumbnail_url
+                  ? <img src={p.thumbnail_url} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ fontSize: 20 }}>{p.name[0]}</span>
+                }
               </div>
-            )}
-
-            {/* Name + brand */}
-            <div style={{ fontSize: 17, fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.25, marginBottom: 4 }}>
-              {product.name}
-            </div>
-            {product.brand && (
-              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 14 }}>
-                {product.brand}{product.model ? ` · ${product.model}` : ""}
-              </div>
-            )}
-
-            {/* Price */}
-            {product.price != null && (
-              <div style={{
-                marginBottom: 16, padding: "10px 14px",
-                background: "var(--color-accent-light)",
-                borderRadius: 8, display: "inline-block",
-              }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color: "var(--color-accent)" }}>
-                  ฿{product.price.toLocaleString("th-TH")}
-                </span>
-                <span style={{ fontSize: 11, color: "var(--color-accent)", marginLeft: 4, opacity: 0.75 }}>
-                  {product.currency}
-                </span>
-              </div>
-            )}
-
-            {/* Description */}
-            {product.description && (
-              <div style={{ marginBottom: 16 }}>
-                <FieldLabel>รายละเอียด</FieldLabel>
-                <div style={{ fontSize: 13, color: "var(--color-text-primary)", lineHeight: 1.65 }}>
-                  {product.description}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A18", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {p.name}
                 </div>
+                {p.brand && <div style={{ fontSize: 11, color: "#888" }}>{p.brand}{p.model ? ` · ${p.model}` : ""}</div>}
+                {p.price != null && (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#8B6520", marginTop: 2 }}>
+                    ฿{p.price.toLocaleString("th-TH")}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          ))}
+        </div>
 
-            {/* Specs table */}
-            {product.specs && Object.keys(product.specs).length > 0 && (
-              <div>
-                <FieldLabel>ข้อมูลจำเพาะ</FieldLabel>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <tbody>
-                    {Object.entries(product.specs).map(([k, v]) => (
-                      <tr key={k} style={{ borderBottom: "0.5px solid var(--color-border)" }}>
-                        <td style={{ padding: "7px 12px 7px 0", color: "var(--color-text-muted)", width: "42%", verticalAlign: "top" }}>{k}</td>
-                        <td style={{ padding: "7px 0", color: "var(--color-text-primary)" }}>{String(v)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
+        {canAttach && (
+          <button
+            onClick={onAttachProduct}
+            style={{
+              width: "100%", marginTop: 14, height: 40,
+              background: "#F5EDD8", border: "0.5px solid #C49A3C",
+              borderRadius: 10, color: "#8B6520", fontSize: 13,
+              fontWeight: 500, cursor: "pointer",
+            }}
+          >
+            + Attach Product
+          </button>
         )}
       </div>
 
-      {/* Resolve / Reopen footer */}
+      {/* Resolve footer */}
       {canResolve && (
-        <div style={{ padding: "12px 16px", borderTop: "0.5px solid var(--color-border)", flexShrink: 0 }}>
+        <div style={{ padding: "12px 16px", borderTop: "0.5px solid #E8E6E0", flexShrink: 0 }}>
           {isResolved ? (
             <button
-              data-testid="reopen-btn"
               onClick={() => reopenMutation.mutate(annotation.id)}
               disabled={isBusy}
               style={{
-                width: "100%", padding: "12px 0", borderRadius: 10,
-                border: "1.5px solid var(--color-border)",
-                background: "transparent", color: "var(--color-text-muted)",
-                fontSize: 13, fontWeight: 600,
-                cursor: isBusy ? "wait" : "pointer",
+                width: "100%", height: 44, background: "#F5F4F0",
+                border: "0.5px solid #E8E6E0", borderRadius: 12,
+                fontSize: 13, fontWeight: 500, cursor: "pointer",
                 opacity: isBusy ? 0.5 : 1,
-                transition: "opacity 0.15s",
               }}
             >
-              {isBusy ? "กำลังดำเนินการ…" : "↩ เปิดใหม่ · Reopen"}
+              {isBusy ? "Processing…" : "↩ Reopen"}
             </button>
           ) : (
             <button
-              data-testid="resolve-btn"
               onClick={() => resolveMutation.mutate(annotation.id)}
               disabled={isBusy}
               style={{
-                width: "100%", padding: "12px 0", borderRadius: 10,
-                border: "none", background: "var(--color-success)",
-                color: "#fff", fontSize: 13, fontWeight: 600,
-                cursor: isBusy ? "wait" : "pointer",
+                width: "100%", height: 44, background: "#EAF3DE",
+                border: "none", borderRadius: 12, color: "#3B6D11",
+                fontSize: 13, fontWeight: 500, cursor: "pointer",
                 opacity: isBusy ? 0.5 : 1,
-                transition: "opacity 0.15s",
-                boxShadow: "0 4px 12px rgba(99,153,34,0.25)",
               }}
             >
-              {isBusy ? "กำลังดำเนินการ…" : "✓ ทำเครื่องหมายว่าแก้ไขแล้ว · Resolve"}
+              {isBusy ? "Processing…" : "✓ Mark as resolved"}
             </button>
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)",
-      textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 7,
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div style={{ animation: "hm-pulse 1.4s ease-in-out infinite" }}>
-      <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 10, background: "var(--color-border)", marginBottom: 16 }} />
-      <div style={{ width: "70%", height: 18, borderRadius: 6, background: "var(--color-border)", marginBottom: 8 }} />
-      <div style={{ width: "45%", height: 13, borderRadius: 6, background: "var(--color-border)", marginBottom: 16 }} />
-      <div style={{ width: "35%", height: 36, borderRadius: 8, background: "var(--color-border)" }} />
-      <style>{`@keyframes hm-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
-    </div>
-  );
-}
-
-function ErrorMsg() {
-  return (
-    <div style={{ color: "var(--color-error)", fontSize: 13, textAlign: "center", padding: 32 }}>
-      <div style={{ fontSize: 28, marginBottom: 8 }}>⚠</div>
-      ไม่สามารถโหลดข้อมูลสินค้าได้
-    </div>
-  );
-}
-
-function NoProduct() {
-  return (
-    <div style={{ color: "var(--color-text-muted)", fontSize: 13, textAlign: "center", padding: 40 }}>
-      <div style={{ fontSize: 32, marginBottom: 10 }}>📎</div>
-      <div style={{ fontWeight: 500, marginBottom: 4 }}>ยังไม่ได้เชื่อมโยงสินค้า</div>
-      <div style={{ fontSize: 11, opacity: 0.6 }}>No product linked to this annotation</div>
     </div>
   );
 }

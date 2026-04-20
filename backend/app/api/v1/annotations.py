@@ -1,18 +1,5 @@
 """
 app/api/v1/annotations.py — HouseMind
-CRUD endpoints for annotations on project images.
-
-Changes vs original:
-  - Added PATCH /{annotation_id}/move  → update pin coordinates + linked product.
-    Merges figmaTem POST /annotations/move/<id> {x, y} into normalised coordinates.
-
-URL contract:
-  GET    /api/v1/annotations?image_id=<uuid>            → list (all roles)
-  POST   /api/v1/annotations                            → create (architect + project owner)
-  DELETE /api/v1/annotations/{annotation_id}            → soft-delete (architect + owner)
-  PATCH  /api/v1/annotations/{annotation_id}/move       → move pin / link product (architect + owner)
-  PATCH  /api/v1/annotations/{annotation_id}/resolve    → resolve thread (architect or contractor)
-  PATCH  /api/v1/annotations/{annotation_id}/reopen     → reopen thread (architect or contractor)
 """
 from __future__ import annotations
 
@@ -20,7 +7,6 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import require_architect_or_contractor, require_project_member, require_project_owner
@@ -31,7 +17,6 @@ from app.db.queries import (
 )
 from app.db.session import get_db
 from app.models.annotation import Annotation
-from app.models.product import Product
 from app.schemas.annotation import (
     AnnotationDetail,
     AnnotationSummary,
@@ -39,31 +24,8 @@ from app.schemas.annotation import (
     CreateAnnotationRequest,
     ResolveAnnotationRequest,
 )
-from app.services.s3 import presign_product_thumbnail
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
-
-
-def _sign_annotation(ann: Annotation) -> AnnotationSummary:
-    thumbnail_url = ""
-    if ann.linked_product_id and hasattr(ann, "_product_s3_key") and ann._product_s3_key:
-        try:
-            thumbnail_url = presign_product_thumbnail(ann._product_s3_key)
-        except RuntimeError:
-            thumbnail_url = ""
-
-    return AnnotationSummary(
-        id=ann.id,
-        image_id=ann.image_id,
-        linked_product_id=ann.linked_product_id,
-        thumbnail_url=thumbnail_url,
-        position_x=ann.position_x,
-        position_y=ann.position_y,
-        created_by=ann.created_by,
-        created_at=ann.created_at,
-        resolved_at=ann.resolved_at,
-        resolved_by=ann.resolved_by,
-    )
 
 
 # ── GET /annotations?image_id=<uuid> ─────────────────────────────────────────
@@ -75,21 +37,20 @@ async def list_annotations(
     _user: dict = Depends(require_project_member),
 ) -> list[AnnotationSummary]:
     annotations = await list_active_annotations_for_image(db, image_id)
-
-    product_ids = [a.linked_product_id for a in annotations if a.linked_product_id]
-    product_keys: dict[uuid.UUID, str] = {}
-    if product_ids:
-        result = await db.execute(
-            select(Product.id, Product.thumbnail_s3_key).where(Product.id.in_(product_ids))
+    return [
+        AnnotationSummary(
+            id=ann.id,
+            image_id=ann.image_id,
+            object_id=ann.object_id,
+            position_x=ann.position_x,
+            position_y=ann.position_y,
+            created_by=ann.created_by,
+            created_at=ann.created_at,
+            resolved_at=ann.resolved_at,
+            resolved_by=ann.resolved_by,
         )
-        product_keys = {row.id: row.thumbnail_s3_key for row in result}
-
-    summaries = []
-    for ann in annotations:
-        ann._product_s3_key = product_keys.get(ann.linked_product_id, "")  # type: ignore[attr-defined]
-        summaries.append(_sign_annotation(ann))
-
-    return summaries
+        for ann in annotations
+    ]
 
 
 # ── POST /annotations ─────────────────────────────────────────────────────────
@@ -103,7 +64,7 @@ async def create_annotation(
     ann = Annotation(
         id=uuid.uuid4(),
         image_id=body.image_id,
-        linked_product_id=body.linked_product_id,
+        object_id=body.object_id,
         position_x=body.position_x,
         position_y=body.position_y,
         label=body.label,
@@ -113,23 +74,10 @@ async def create_annotation(
     db.add(ann)
     await db.flush()
 
-    thumbnail_url = ""
-    if ann.linked_product_id:
-        result = await db.execute(
-            select(Product.thumbnail_s3_key).where(Product.id == ann.linked_product_id)
-        )
-        s3_key = result.scalar_one_or_none()
-        if s3_key:
-            try:
-                thumbnail_url = presign_product_thumbnail(s3_key)
-            except RuntimeError:
-                pass
-
     return AnnotationSummary(
         id=ann.id,
         image_id=ann.image_id,
-        linked_product_id=ann.linked_product_id,
-        thumbnail_url=thumbnail_url,
+        object_id=ann.object_id,
         position_x=ann.position_x,
         position_y=ann.position_y,
         created_by=ann.created_by,
@@ -148,12 +96,6 @@ async def move_annotation(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ) -> AnnotationSummary:
-    """
-    Update annotation pin position and/or linked product.
-    Merges figmaTem's POST /annotations/move/<id> {x, y} into normalised coordinates.
-    All fields are optional — send only what changed.
-    position_x / position_y must be in [0.0, 1.0] (normalised, not pixels).
-    """
     ann = await get_active_annotation(db, annotation_id)
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
@@ -162,30 +104,13 @@ async def move_annotation(
         ann.position_x = body.position_x
     if body.position_y is not None:
         ann.position_y = body.position_y
-    if body.unlink_product:
-        ann.linked_product_id = None
-    elif body.linked_product_id is not None:
-        ann.linked_product_id = body.linked_product_id
 
     await db.flush()
-
-    thumbnail_url = ""
-    if ann.linked_product_id:
-        result = await db.execute(
-            select(Product.thumbnail_s3_key).where(Product.id == ann.linked_product_id)
-        )
-        s3_key = result.scalar_one_or_none()
-        if s3_key:
-            try:
-                thumbnail_url = presign_product_thumbnail(s3_key)
-            except RuntimeError:
-                pass
 
     return AnnotationSummary(
         id=ann.id,
         image_id=ann.image_id,
-        linked_product_id=ann.linked_product_id,
-        thumbnail_url=thumbnail_url,
+        object_id=ann.object_id,
         position_x=ann.position_x,
         position_y=ann.position_y,
         created_by=ann.created_by,
@@ -205,7 +130,10 @@ async def delete_annotation(
 ):
     ann = await soft_delete_annotation(db, annotation_id)
     if ann is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found or already deleted")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Annotation not found or already deleted",
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -222,7 +150,7 @@ async def resolve_annotation(
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
     if ann.resolved_at is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Annotation already resolved")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already resolved")
 
     ann.resolved_at = datetime.now(timezone.utc)
     ann.resolved_by = uuid.UUID(user["user_id"])
@@ -233,8 +161,7 @@ async def resolve_annotation(
     return AnnotationDetail(
         id=ann.id,
         image_id=ann.image_id,
-        linked_product_id=ann.linked_product_id,
-        thumbnail_url="",
+        object_id=ann.object_id,
         position_x=ann.position_x,
         position_y=ann.position_y,
         created_by=ann.created_by,
@@ -259,7 +186,7 @@ async def reopen_annotation(
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
     if ann.resolved_at is None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Annotation is not resolved")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not resolved")
 
     ann.resolved_at = None
     ann.resolved_by = None
@@ -268,8 +195,7 @@ async def reopen_annotation(
     return AnnotationDetail(
         id=ann.id,
         image_id=ann.image_id,
-        linked_product_id=ann.linked_product_id,
-        thumbnail_url="",
+        object_id=ann.object_id,
         position_x=ann.position_x,
         position_y=ann.position_y,
         created_by=ann.created_by,

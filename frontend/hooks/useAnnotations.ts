@@ -1,17 +1,9 @@
 // hooks/useAnnotations.ts
-//
-// Integration fixes:
-//   - All API calls now go through lib/auth's authFetch (handles 401 redirect)
-//   - NEXT_PUBLIC_API_BASE_URL must be set to http://localhost:8000/api/v1
-//   - reopen PATCH now sends body: JSON.stringify({}) to satisfy FastAPI
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/auth";
-import { useAnnotationStore, type Annotation, type ProductDetail } from "@/store/annotationStore";
+import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-
-// ─── Annotation hooks ────────────────────────────────────────────────────────
 
 export function useAnnotations(imageId: string) {
   const setAnnotations = useAnnotationStore((s) => s.setAnnotations);
@@ -37,14 +29,14 @@ export function useCreateAnnotation(imageId: string, projectId: string) {
     mutationFn: async (payload: {
       positionX: number;
       positionY: number;
-      linkedProductId?: string | null;
+      objectId: number;
     }) => {
-      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
+      if (imageId.startsWith("local-")) throw new Error("Session-only image");
       const res = await authFetch(`${API}/annotations?project_id=${projectId}`, {
         method: "POST",
         body: JSON.stringify({
           image_id: imageId,
-          linked_product_id: payload.linkedProductId ?? null,
+          object_id: payload.objectId,
           position_x: payload.positionX,
           position_y: payload.positionY,
         }),
@@ -65,7 +57,6 @@ export function useDeleteAnnotation(imageId: string) {
 
   return useMutation({
     mutationFn: async (annotationId: string) => {
-      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
       const res = await authFetch(`${API}/annotations/${annotationId}`, {
         method: "DELETE",
       });
@@ -80,63 +71,43 @@ export function useDeleteAnnotation(imageId: string) {
 
 export function useResolveAnnotation(imageId: string) {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: async (annotationId: string) => {
-      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
       const res = await authFetch(`${API}/annotations/${annotationId}/resolve`, {
         method: "PATCH",
         body: JSON.stringify({}),
       });
-      if (!res.ok) throw new Error("Failed to resolve annotation");
+      if (!res.ok) throw new Error("Failed to resolve");
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["annotations", imageId] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["annotations", imageId] }),
   });
 }
 
 export function useReopenAnnotation(imageId: string) {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: async (annotationId: string) => {
-      if (imageId.startsWith("local-")) throw new Error("Cannot save annotations on session-only images");
-      // body required — FastAPI rejects PATCH with no body when Content-Type is set
       const res = await authFetch(`${API}/annotations/${annotationId}/reopen`, {
         method: "PATCH",
         body: JSON.stringify({}),
       });
-      if (!res.ok) throw new Error("Failed to reopen annotation");
+      if (!res.ok) throw new Error("Failed to reopen");
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["annotations", imageId] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["annotations", imageId] }),
   });
 }
 
-// ─── Product detail hook ──────────────────────────────────────────────────────
-// Lazy — only fires when user taps a pin. staleTime: 55 min (S3 expiry buffer).
-
 export function useProductDetail(productId: string | null) {
-  const cacheProductDetail = useAnnotationStore((s) => s.cacheProductDetail);
-  const cachedDetail = useAnnotationStore((s) =>
-    productId ? s.productDetails[productId] : undefined
-  );
-
   return useQuery({
     queryKey: ["product", productId],
     queryFn: async () => {
       const res = await authFetch(`${API}/products/${productId}`);
-      if (!res.ok) throw new Error("Failed to fetch product detail");
-      const data: ProductDetail = await res.json();
-      cacheProductDetail(productId!, data);
-      return data;
+      if (!res.ok) throw new Error("Failed to fetch product");
+      return res.json();
     },
-    enabled: !!productId && !cachedDetail,
-    placeholderData: cachedDetail,
-    staleTime: 3_300_000, // 55 min
+    enabled: !!productId,
+    staleTime: 3_300_000,
   });
 }

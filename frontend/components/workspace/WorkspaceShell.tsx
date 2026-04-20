@@ -1,11 +1,9 @@
 "use client";
 
-// components/workspace/WorkspaceShell.tsx
-// Fixes applied:
-//   - Loads images from DB via useProjectImages on mount
-//   - Guards canvas mutations with auth.isAuthenticated (no redirect if not logged in)
-//   - File upload persists to DB via presign → S3 → confirm flow
-//   - URL paste remains session-only (clearly labelled)
+// components/workspace/WorkspaceShell.tsx — HouseMind
+// Long press empty canvas → fan emoji menu → create annotation → panel opens
+// Single tap pin → product panel
+// Long press pin → delete confirmation
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,14 +13,29 @@ import {
   useDeleteAnnotation,
   useResolveAnnotation,
   useReopenAnnotation,
-  useProductDetail,
 } from "@/hooks/useAnnotations";
 import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectImages } from "@/hooks/useProjectImages";
+import { useProjectProducts, useLinkProduct } from "@/hooks/useProducts";
 import { authFetch } from "@/lib/auth";
+import { ProductDetailPanel } from "@/components/annotation/ProductDetailPanel";
+import { ProductPickerModal } from "@/components/annotation/ProductPickerModal";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+// Object ID to emoji + label mapping — edit here to change icons
+const OBJECT_DEFS: Record<number, { emoji: string; label: string }> = {
+  101: { emoji: "😊", label: "Smile" },
+  102: { emoji: "⭐", label: "Star" },
+  103: { emoji: "❤️", label: "Heart" },
+  104: { emoji: "📷", label: "Camera" },
+  105: { emoji: "🌿", label: "Leaf" },
+  106: { emoji: "🗺️", label: "Map" },
+  107: { emoji: "💵", label: "Dollar" },
+  108: { emoji: "🏷️", label: "Tag" },
+};
+const OBJECT_IDS = Object.keys(OBJECT_DEFS).map(Number);
 
 interface Slide { imageId: string; url: string; label: string; }
 
@@ -33,26 +46,22 @@ interface Props {
   forceReadOnly?: boolean;
 }
 
-const PIN_COLORS = ["#7F77DD", "#C9A84C", "#639922", "#E24B4A", "#888780", "#534AB7"];
+const PIN_COLORS = ["#7F77DD", "#C9A84C", "#639922", "#E24B4A", "#888780", "#534AB7", "#C05A30", "#3B6D11"];
 
 export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: Props) {
   const auth = useAuth();
   const readOnly = forceReadOnly || auth.isReadOnly;
   const qc = useQueryClient();
 
-  // ── Slides state (seeded from DB, falls back to URL param) ──────────────
-  const [slides, setSlides] = useState<Slide[]>([
-    { imageId, url: imageUrl, label: "Reference 1" },
-  ]);
+  // ── Slides ────────────────────────────────────────────────────────────────
+  const [slides, setSlides] = useState<Slide[]>([{ imageId, url: imageUrl, label: "Reference 1" }]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const activeSlide = slides[currentSlide];
   const seededFromDb = useRef(false);
-
   const { data: dbImages, refetch: refetchImages } = useProjectImages(projectId);
 
   useEffect(() => {
-    if (seededFromDb.current) return;
-    if (!dbImages || dbImages.length === 0) return;
+    if (seededFromDb.current || !dbImages || dbImages.length === 0) return;
     seededFromDb.current = true;
     const dbSlides: Slide[] = dbImages.map((img, i) => ({
       imageId: img.id,
@@ -64,22 +73,36 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     setCurrentSlide(idx >= 0 ? idx : 0);
   }, [dbImages, imageId]);
 
-  // ── UI state ─────────────────────────────────────────────────────────────
-  const [filmExpanded, setFilmExpanded]       = useState(false);
-  const [refInput, setRefInput]               = useState("");
-  const [uploading, setUploading]             = useState(false);
-  const [uploadError, setUploadError]         = useState("");
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  // const fileInputRef = useRef<HTMLInputElement>(null);
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [filmExpanded, setFilmExpanded] = useState(false);
+  const [refInput, setRefInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  // Fan menu state
+  const [fanVisible, setFanVisible] = useState(false);
+  const [fanPos, setFanPos] = useState({ x: 0, y: 0 });
+  const [pendingPos, setPendingPos] = useState({ normX: 0, normY: 0 });
+
+  // Delete confirm state
+  const [deleteTarget, setDeleteTarget] = useState<Annotation | null>(null);
+
+  // Active pin for product panel
+  const [activePinId, setActivePinId] = useState<string | null>(null);
+
+  // Product picker modal
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // ── Annotations ───────────────────────────────────────────────────────────
   useAnnotations(activeSlide.imageId);
-  const annotations   = useAnnotationStore((s) => s.annotationsByImage[activeSlide.imageId] ?? []);
+  const annotations = useAnnotationStore((s) => s.annotationsByImage[activeSlide.imageId] ?? []);
   const createMutation = useCreateAnnotation(activeSlide.imageId, projectId);
   const deleteMutation = useDeleteAnnotation(activeSlide.imageId);
+  const linkProduct = useLinkProduct(projectId);
 
-  const activeAnnotation = activeAnnotationId
-    ? annotations.find((a) => a.id === activeAnnotationId) ?? null
+  const activeAnnotation = activePinId
+    ? annotations.find((a) => a.id === activePinId) ?? null
     : null;
 
   // ── Canvas helpers ────────────────────────────────────────────────────────
@@ -90,77 +113,73 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     if (!el) return null;
     const rect = el.getBoundingClientRect();
     return {
-      x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
+      normX: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+      normY: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
     };
   }, []);
 
-  // Guard: only call mutation when authenticated to prevent 401 redirect
-  const createAt = useCallback(
-    (clientX: number, clientY: number) => {
-      if (readOnly) return;
-      if (!auth.isAuthenticated) return;
-      const norm = toNorm(clientX, clientY);
+  // Long press on empty canvas
+  const canvasLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasTouchStart = useRef<{ x: number; y: number } | null>(null);
+
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly || !auth.isAuthenticated) return;
+    canvasTouchStart.current = { x: e.clientX, y: e.clientY };
+    canvasLongPressTimer.current = setTimeout(() => {
+      const norm = toNorm(e.clientX, e.clientY);
       if (!norm) return;
-      createMutation.mutate({ positionX: norm.x, positionY: norm.y });
-    },
-    [readOnly, auth.isAuthenticated, toNorm, createMutation],
-  );
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (activeAnnotationId) { setActiveAnnotationId(null); return; }
-    createAt(e.clientX, e.clientY);
+      setPendingPos(norm);
+      setFanPos({ x: e.clientX, y: e.clientY });
+      setFanVisible(true);
+    }, 600);
   };
 
-  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.target !== e.currentTarget) return;
-    createAt(e.clientX, e.clientY);
-  };
-
-  // ── Image upload — presign → S3 PUT → confirm ─────────────────────────────
-  const handleFileUpload = async (file: File) => {
-    if (!auth.isAuthenticated) {
-      setUploadError("Sign in to upload images.");
-      return;
+  const handleCanvasPointerUp = () => {
+    if (canvasLongPressTimer.current) {
+      clearTimeout(canvasLongPressTimer.current);
+      canvasLongPressTimer.current = null;
     }
-    setUploading(true);
-    setUploadError("");
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = canvasTouchStart.current;
+    if (!start) return;
+    const moved = Math.abs(e.clientX - start.x) > 8 || Math.abs(e.clientY - start.y) > 8;
+    if (moved && canvasLongPressTimer.current) {
+      clearTimeout(canvasLongPressTimer.current);
+      canvasLongPressTimer.current = null;
+    }
+  };
+
+  // Pick emoji from fan menu
+  const handleEmojiPick = async (objectId: number) => {
+    setFanVisible(false);
+    const ann = await createMutation.mutateAsync({
+      positionX: pendingPos.normX,
+      positionY: pendingPos.normY,
+      objectId,
+    });
+    setActivePinId(ann.id);
+  };
+
+  // Image upload
+  const handleFileUpload = async (file: File) => {
+    if (!auth.isAuthenticated) { setUploadError("Sign in to upload."); return; }
+    setUploading(true); setUploadError("");
     try {
-      // Step 1: get presigned PUT URL from backend
       const presignRes = await authFetch(`${API}/images/upload-url?project_id=${projectId}`, {
         method: "POST",
-        body: JSON.stringify({
-          project_id: projectId,
-          filename: file.name,
-          content_type: file.type,
-        }),
+        body: JSON.stringify({ project_id: projectId, filename: file.name, content_type: file.type }),
       });
       if (!presignRes.ok) throw new Error("Could not get upload URL");
       const { upload_url, s3_key } = await presignRes.json();
-
-      // Step 2: PUT file directly to S3
-      const s3Res = await fetch(upload_url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
+      const s3Res = await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       if (!s3Res.ok) throw new Error("S3 upload failed");
-
-      // Step 3: confirm with backend so DB record is created
       const confirmRes = await authFetch(`${API}/images/confirm?project_id=${projectId}`, {
         method: "POST",
-        body: JSON.stringify({
-          project_id: projectId,
-          s3_key,
-          original_filename: file.name,
-          mime_type: file.type,
-        }),
+        body: JSON.stringify({ project_id: projectId, s3_key, original_filename: file.name, mime_type: file.type }),
       });
-      if (!confirmRes.ok) throw new Error("Upload confirmation failed");
-
-      // Refresh slide list from DB
+      if (!confirmRes.ok) throw new Error("Confirmation failed");
       seededFromDb.current = false;
       await refetchImages();
       setFilmExpanded(false);
@@ -171,58 +190,71 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     }
   };
 
-  // Session-only URL paste (no DB, disappears on refresh — shown in UI)
-const submitRef = async () => {
+  const submitRef = async () => {
     const url = refInput.trim();
     if (!url) return;
     if (auth.isAuthenticated) {
-      // Persist to DB
       try {
         const res = await authFetch(`${API}/images/from-url?project_id=${projectId}`, {
           method: "POST",
-          body: JSON.stringify({
-            project_id: projectId,
-            url,
-            original_filename: url.split("/").pop() ?? "reference",
-          }),
+          body: JSON.stringify({ project_id: projectId, url, original_filename: url.split("/").pop() }),
         });
         if (res.ok) {
           seededFromDb.current = false;
           await refetchImages();
-          setRefInput("");
-          setFilmExpanded(false);
+          setRefInput(""); setFilmExpanded(false);
           return;
         }
-      } catch {
-        // fall through to session-only
-      }
+      } catch { /* fall through */ }
     }
     const idx = slides.length;
     setSlides((prev) => [...prev, { imageId: `local-${idx}`, url, label: `Reference ${idx + 1} (session)` }]);
     setCurrentSlide(idx);
-    setRefInput("");
-    setFilmExpanded(false);
+    setRefInput(""); setFilmExpanded(false);
   };
+
+  // Get object_id of active annotation for filtering products
+  const activeObjectId = activeAnnotation?.object_id ?? null;
+  // Unique object_ids visible on current image
+  const visibleObjectIds = [...new Set(annotations.map((a) => a.object_id))];
 
   return (
     <>
-      
+      {/* Fan emoji menu */}
+      {fanVisible && (
+        <FanEmojiMenu
+          pos={fanPos}
+          onPick={handleEmojiPick}
+          onClose={() => setFanVisible(false)}
+        />
+      )}
 
-      {/* Hidden file input — triggered by upload button */}
-      {/* <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFileUpload(file);
-          e.target.value = ""; // reset so same file can be re-selected
-        }}
-      /> */}
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <DeleteConfirmPopup
+          annotation={deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => {
+            deleteMutation.mutate(deleteTarget.id);
+            setDeleteTarget(null);
+            if (activePinId === deleteTarget.id) setActivePinId(null);
+          }}
+        />
+      )}
+
+      {/* Product picker modal */}
+      {pickerOpen && (
+        <ProductPickerModal
+          projectId={projectId}
+          onSelect={async (productId) => {
+            await linkProduct.mutateAsync(productId);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
 
       <div className="hm-app">
-        {/* Not logged in warning */}
         {!auth.isAuthenticated && (
           <div className="hm-no-auth">
             Not signed in — annotations won&apos;t save.{" "}
@@ -230,20 +262,16 @@ const submitRef = async () => {
           </div>
         )}
 
-        {/* Hero bar */}
         <div className="hm-hero-bar">
           <div>
             <div className="hm-wordmark">House<span>Mind</span></div>
             <div className="hm-hero-sub">Visual decisions workspace</div>
           </div>
           <a href="/login" style={{ textDecoration: "none" }}>
-            <button className="hm-role-badge">
-              {auth.role ?? "Sign in"}
-            </button>
+            <button className="hm-role-badge">{auth.role ?? "Sign in"}</button>
           </a>
         </div>
 
-        {/* Project nav */}
         <div className="hm-proj-nav">
           <div>
             <div className="hm-proj-label">Project</div>
@@ -255,47 +283,42 @@ const submitRef = async () => {
             </div>
           </div>
           {!readOnly && (
-            <button className="hm-add-btn">+ Add item</button>
+            <button className="hm-add-btn" onClick={() => setPickerOpen(true)}>+ Attach Product</button>
           )}
         </div>
 
         {/* Canvas */}
         <div className="hm-canvas-wrap">
           {activeSlide.url && (
-            // eslint-disable-next-line @next/next/no-img-element
             <img className="hm-canvas-img" src={activeSlide.url} alt={activeSlide.label} />
           )}
 
-          {/* Tap zone — z-index:5, BELOW pins */}
           <div
             ref={canvasRef}
             className="hm-canvas-tap"
-            onClick={handleCanvasClick}
-            onContextMenu={handleContextMenu}
+            onPointerDown={handleCanvasPointerDown}
+            onPointerUp={handleCanvasPointerUp}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerLeave={handleCanvasPointerUp}
           />
 
-          {/* Hint */}
           {annotations.length === 0 && !readOnly && (
             <div className="hm-canvas-hint">
-              {auth.isAuthenticated
-                ? "Click to annotate"
-                : "Sign in to annotate"}
+              {auth.isAuthenticated ? "Hold to annotate" : "Sign in to annotate"}
             </div>
           )}
 
-          {/* Pins — z-index:15, ABOVE tap zone */}
           <PinsLayer
             annotations={annotations}
-            activeId={activeAnnotationId}
-            onSelect={(id) => setActiveAnnotationId(id)}
-            onDelete={readOnly ? undefined : (id) => deleteMutation.mutate(id)}
+            activeId={activePinId}
+            onSingleTap={(id) => setActivePinId((prev) => prev === id ? null : id)}
+            onLongPress={(ann) => setDeleteTarget(ann)}
           />
 
-          {(createMutation.isPending || uploading) && (
+          {createMutation.isPending && (
             <div className="hm-creating"><div className="spinner" /></div>
           )}
 
-          {/* Carousel nav */}
           {slides.length > 1 && (
             <div className="hm-carousel-nav">
               <button className="hm-c-btn" onClick={() => setCurrentSlide((i) => (i - 1 + slides.length) % slides.length)}>‹</button>
@@ -307,133 +330,260 @@ const submitRef = async () => {
           <div className={`hm-filmstrip ${filmExpanded ? "expanded" : "collapsed"}`}>
             <div className="hm-tray-row">
               {slides.map((s, i) => (
-                <div
-                  key={s.imageId}
-                  className={`hm-film-thumb ${i === currentSlide ? "active" : ""}`}
-                  onClick={() => { setCurrentSlide(i); setFilmExpanded(false); }}
-                >
+                <div key={s.imageId} className={`hm-film-thumb ${i === currentSlide ? "active" : ""}`}
+                  onClick={() => { setCurrentSlide(i); setFilmExpanded(false); }}>
                   {s.url && <img src={s.url} alt={s.label} />}
                   <span style={{ position: "relative", zIndex: 1 }}>{i + 1}</span>
-                  <span className="hm-slide-num">img</span>
                 </div>
               ))}
               <button className="hm-film-add" onClick={() => setFilmExpanded((v) => !v)}>
                 <span className="hm-film-add-icon">+</span>
                 <span className="hm-film-add-label">Add</span>
               </button>
-              <span className="hm-tray-hint">Filmstrip</span>
             </div>
-
             {filmExpanded && (
               <div className="hm-tray-upload-row">
-                {/* Row 1: file upload (persists to DB) + close */}
                 <div className="hm-tray-input-row">
-                  <label className="hm-tray-file-btn" style={{ opacity: (uploading || !auth.isAuthenticated) ? 0.5 : 1, pointerEvents: (uploading || !auth.isAuthenticated) ? "none" : "auto" }}>
+                  <label className="hm-tray-file-btn" style={{ opacity: (uploading || !auth.isAuthenticated) ? 0.5 : 1 }}>
                     📁 {uploading ? "Uploading…" : "Upload image"}
-                    <input
-                      id="filmstrip-file-upload"
-                      name="filmstrip-file-upload"
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file);
-                        e.target.value = "";
-                      }}
-                    />
+                    <input type="file" accept="image/*" style={{ display: "none" }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
                   </label>
                   <div style={{ flex: 1 }} />
                   <button className="hm-tray-close" onClick={() => { setFilmExpanded(false); setRefInput(""); setUploadError(""); }}>×</button>
                 </div>
-                {/* Row 2: URL paste (session-only) */}
                 <div className="hm-tray-input-row">
-                  <input
-                    className="hm-tray-input"
-                    placeholder="Or paste image URL (session only)…"
-                    value={refInput}
-                    onChange={(e) => setRefInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && submitRef()}
-                  />
+                  <input className="hm-tray-input" placeholder="Or paste image URL…" value={refInput}
+                    onChange={(e) => setRefInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitRef()} />
                   <button className="hm-tray-submit" onClick={submitRef}>Add</button>
                 </div>
                 {uploadError && <div className="hm-upload-error">⚠ {uploadError}</div>}
-                <div className="hm-upload-note">Uploaded files persist · Pasted URLs are session-only</div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Product section */}
-        <div className="hm-section-header">
-          <div className="hm-section-title">Referenced Items</div>
-          <div className="hm-item-count">{annotations.length} {annotations.length === 1 ? "item" : "items"}</div>
-        </div>
-        <div className="hm-product-grid">
-          {annotations.map((ann, i) => (
-            <AnnotationCard
-              key={ann.id}
-              annotation={ann}
-              index={i}
-              readOnly={readOnly}
-              onClick={() => setActiveAnnotationId(ann.id)}
-              onDelete={() => deleteMutation.mutate(ann.id)}
-            />
-          ))}
-          {annotations.length === 0 && (
-            <div style={{ gridColumn: "1/-1", padding: "40px 0", textAlign: "center", color: "var(--stone-300)", fontFamily: "'DM Serif Display',serif", fontSize: 15 }}>
-              {auth.isAuthenticated
-                ? "Click the canvas above to add annotations"
-                : "Sign in to add annotations"}
-            </div>
-          )}
-        </div>
-
-        {/* Detail panel */}
+        {/* Product panel — shows when pin selected */}
         {activeAnnotation && (
-          <DetailPanel
+          <ProductDetailPanel
             annotation={activeAnnotation}
+            projectId={projectId}
+            canAttach={!readOnly && auth.canWrite}
             canResolve={auth.canResolve}
             imageId={activeSlide.imageId}
-            onClose={() => setActiveAnnotationId(null)}
+            onClose={() => setActivePinId(null)}
+            onAttachProduct={() => setPickerOpen(true)}
           />
+        )}
+
+        {/* Product grid — all visible products */}
+        {!activeAnnotation && (
+          <>
+            <div className="hm-section-header">
+              <div className="hm-section-title">
+                {showAllProducts ? "All Project Products" : "Products"}
+              </div>
+              <button
+                style={{ fontSize: 11, color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer" }}
+                onClick={() => setShowAllProducts((v) => !v)}
+              >
+                {showAllProducts ? "Filter by pin" : "Show all"}
+              </button>
+            </div>
+            <ProductGrid
+              projectId={projectId}
+              objectIds={showAllProducts ? null : visibleObjectIds}
+              annotations={annotations}
+            />
+          </>
         )}
       </div>
     </>
   );
 }
 
+// ── Fan emoji menu ────────────────────────────────────────────────────────────
+
+function FanEmojiMenu({
+  pos,
+  onPick,
+  onClose,
+}: {
+  pos: { x: number; y: number };
+  onPick: (objectId: number) => void;
+  onClose: () => void;
+}) {
+  // 8 items fanned in a semicircle above the press point
+  const radius = 72;
+  const startAngle = 180; // left
+  const endAngle = 360;   // right (upper half)
+  const count = OBJECT_IDS.length;
+
+  return (
+    <>
+      {/* backdrop */}
+      <div
+        style={{ position: "fixed", inset: 0, zIndex: 100 }}
+        onClick={onClose}
+      />
+      <div style={{ position: "fixed", left: pos.x, top: pos.y, zIndex: 101, transform: "translate(-50%, -50%)" }}>
+        {OBJECT_IDS.map((objectId, i) => {
+          const angle = startAngle + (i / (count - 1)) * (endAngle - startAngle);
+          const rad = (angle * Math.PI) / 180;
+          const x = Math.cos(rad) * radius;
+          const y = Math.sin(rad) * radius;
+          const def = OBJECT_DEFS[objectId];
+          return (
+            <button
+              key={objectId}
+              onClick={() => onPick(objectId)}
+              title={def.label}
+              style={{
+                position: "absolute",
+                left: x,
+                top: y,
+                transform: "translate(-50%, -50%)",
+                width: 42,
+                height: 42,
+                borderRadius: "50%",
+                background: "#fff",
+                border: "2px solid #555",
+                fontSize: 20,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                transition: "transform 0.15s",
+                zIndex: 102,
+              }}
+            >
+              {def.emoji}
+            </button>
+          );
+        })}
+        {/* center dot */}
+        <div style={{
+          position: "absolute", left: 0, top: 0,
+          transform: "translate(-50%, -50%)",
+          width: 16, height: 16, borderRadius: "50%",
+          background: "#555",
+        }} />
+      </div>
+    </>
+  );
+}
+
+// ── Delete confirm popup ──────────────────────────────────────────────────────
+
+function DeleteConfirmPopup({
+  annotation,
+  onCancel,
+  onConfirm,
+}: {
+  annotation: Annotation;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const def = OBJECT_DEFS[annotation.object_id];
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200,
+      background: "rgba(0,0,0,0.4)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
+        width: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+      }}>
+        <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>
+          {def?.emoji ?? "📍"}
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 4 }}>
+          Delete annotation?
+        </div>
+        <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 20 }}>
+          {def?.label ?? "Pin"} · {Math.round(annotation.position_x * 100)}%, {Math.round(annotation.position_y * 100)}%
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, height: 40, borderRadius: 10,
+              border: "0.5px solid #ddd", background: "#f5f5f5",
+              fontSize: 13, cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, height: 40, borderRadius: 10,
+              border: "none", background: "#E24B4A",
+              color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Pins layer ────────────────────────────────────────────────────────────────
 
-function PinsLayer({ annotations, activeId, onSelect, onDelete }: {
+function PinsLayer({
+  annotations,
+  activeId,
+  onSingleTap,
+  onLongPress,
+}: {
   annotations: Annotation[];
   activeId: string | null;
-  onSelect: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onSingleTap: (id: string) => void;
+  onLongPress: (ann: Annotation) => void;
 }) {
-  const timerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const timerRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const startPos = useRef<Record<string, { x: number; y: number }>>({});
 
   return <>
     {annotations.map((ann, i) => {
       const isActive = ann.id === activeId;
       const color = PIN_COLORS[i % PIN_COLORS.length];
+      const def = OBJECT_DEFS[ann.object_id];
 
       return (
         <div
           key={ann.id}
           className="hm-pin"
           style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%` }}
-          onClick={(e) => { e.stopPropagation(); onSelect(ann.id); }}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onDelete?.(ann.id); }}
           onPointerDown={(e) => {
             e.stopPropagation();
-            timerRef.current[ann.id] = setTimeout(() => { onDelete?.(ann.id); }, 600);
+            startPos.current[ann.id] = { x: e.clientX, y: e.clientY };
+            timerRefs.current[ann.id] = setTimeout(() => {
+              onLongPress(ann);
+            }, 600);
           }}
-          onPointerUp={(e) => { e.stopPropagation(); clearTimeout(timerRef.current[ann.id]); }}
-          onPointerLeave={() => clearTimeout(timerRef.current[ann.id])}
+          onPointerUp={(e) => {
+            e.stopPropagation();
+            const start = startPos.current[ann.id];
+            const moved = start
+              ? Math.abs(e.clientX - start.x) > 6 || Math.abs(e.clientY - start.y) > 6
+              : false;
+            if (timerRefs.current[ann.id]) {
+              clearTimeout(timerRefs.current[ann.id]);
+              if (!moved) onSingleTap(ann.id);
+            }
+          }}
+          onPointerLeave={() => clearTimeout(timerRefs.current[ann.id])}
         >
-          <div className={`hm-pin-bubble ${isActive ? "active" : ""}`} style={{ background: color }}>
-            <div className="hm-pin-inner">{i + 1}</div>
+          <div
+            className={`hm-pin-bubble ${isActive ? "active" : ""}`}
+            style={{ background: color, fontSize: 16 }}
+          >
+            <div className="hm-pin-inner">{def?.emoji ?? "📍"}</div>
           </div>
           <div className="hm-pin-tail" />
         </div>
@@ -442,109 +592,50 @@ function PinsLayer({ annotations, activeId, onSelect, onDelete }: {
   </>;
 }
 
-// ── Annotation card ───────────────────────────────────────────────────────────
+// ── Product grid ──────────────────────────────────────────────────────────────
 
-const LETTERS = "MFBCAVDKSPRTZWQJYING";
-
-function AnnotationCard({ annotation, index, readOnly, onClick, onDelete }: {
-  annotation: Annotation; index: number; readOnly: boolean;
-  onClick: () => void; onDelete: () => void;
+function ProductGrid({
+  projectId,
+  objectIds,
+  annotations,
+}: {
+  projectId: string;
+  objectIds: number[] | null;
+  annotations: Annotation[];
 }) {
-  const color = PIN_COLORS[index % PIN_COLORS.length];
-  const isResolved = !!annotation.resolved_at;
+  const { data: allProducts = [] } = useProjectProducts(projectId);
+
+  // If filtering, keep only products whose object matches visible annotations
+  // Since object_products doesn't store object_id, we show all project products
+  // when objectIds is null (show all), or all of them when objectIds present
+  // (future: can filter by tagging products with object_id if needed)
+  const products = allProducts;
+
+  if (products.length === 0) {
+    return (
+      <div style={{ padding: "40px 20px", textAlign: "center", color: "#888", fontSize: 13 }}>
+        No products yet — attach one via a pin
+      </div>
+    );
+  }
 
   return (
-    <div className="hm-prod-card" onClick={onClick}>
-      {!readOnly && (
-        <button className="hm-prod-del" onClick={(e) => { e.stopPropagation(); onDelete(); }}>×</button>
-      )}
-      <div className="hm-prod-img">
-        {annotation.thumbnail_url
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={annotation.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <div className="hm-prod-letter">{LETTERS[index % LETTERS.length]}</div>
-        }
-      </div>
-      <div className="hm-prod-title">Annotation #{index + 1}</div>
-      <div className="hm-prod-tag" style={{ color }}>#{index} {isResolved ? "✓" : "○"}</div>
-      {isResolved && <div className="hm-resolved-badge">✓ Resolved</div>}
-      <div className="hm-prod-contact">
-        {Math.round(annotation.position_x * 100)}%, {Math.round(annotation.position_y * 100)}%
-      </div>
-    </div>
-  );
-}
-
-// ── Detail panel ──────────────────────────────────────────────────────────────
-
-function DetailPanel({ annotation, canResolve, imageId, onClose }: {
-  annotation: Annotation; canResolve: boolean; imageId: string; onClose: () => void;
-}) {
-  const { data: product, isLoading } = useProductDetail(annotation.linked_product_id);
-  const resolveMutation = useResolveAnnotation(imageId);
-  const reopenMutation  = useReopenAnnotation(imageId);
-  const isResolved = !!annotation.resolved_at;
-  const isBusy = resolveMutation.isPending || reopenMutation.isPending;
-
-  const SPECS = [
-    { k: "Position X", v: `${Math.round(annotation.position_x * 100)}%` },
-    { k: "Position Y", v: `${Math.round(annotation.position_y * 100)}%` },
-    { k: "Status", v: isResolved ? "Resolved" : "Open" },
-    ...(product?.specs ? Object.entries(product.specs).map(([k, v]) => ({ k, v: String(v) })) : []),
-  ];
-
-  return (
-    <div className="hm-detail-panel">
-      <div className="hm-detail-header">
-        <div className="hm-detail-label" style={{ color: isResolved ? "var(--success)" : undefined }}>
-          {isResolved ? "✓ Resolved" : "Item detail"}
-        </div>
-        <button className="hm-close-btn" onClick={onClose}>×</button>
-      </div>
-      <div className="hm-detail-img">
-        {isLoading ? <div className="spinner" />
-          : annotation.thumbnail_url
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={annotation.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <div style={{ fontFamily: "'DM Serif Display',serif", fontSize: 56, color: "var(--stone-300)" }}>
-                {LETTERS[0]}
-              </div>
-        }
-      </div>
-      <div className="hm-detail-body">
-        <div className="hm-detail-name">{product?.name ?? `Pin #${annotation.id.slice(0, 6)}`}</div>
-        {product?.brand && (
-          <div className="hm-detail-brand">{product.brand}{product.model ? ` · ${product.model}` : ""}</div>
-        )}
-        {product?.price != null && (
-          <div className="hm-price-chip">฿ {product.price.toLocaleString("th-TH")}</div>
-        )}
-        <div className="hm-spec-label">Specifications</div>
-        {SPECS.map((s) => (
-          <div key={s.k} className="hm-spec-row">
-            <span className="hm-spec-key">{s.k}</span>
-            <span className="hm-spec-val">{String(s.v)}</span>
+    <div className="hm-product-grid">
+      {products.map((p, i) => (
+        <div key={p.id} className="hm-prod-card">
+          <div className="hm-prod-img">
+            {p.thumbnail_url
+              ? <img src={p.thumbnail_url} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <div className="hm-prod-letter">{p.name[0]}</div>
+            }
           </div>
-        ))}
-        {product?.description && (
-          <div className="hm-contact-block">
-            <div style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--stone-500)", marginBottom: 4 }}>Description</div>
-            <div>{product.description}</div>
-          </div>
-        )}
-      </div>
-      {canResolve && (
-        <div className="hm-detail-footer">
-          {isResolved
-            ? <button className="hm-reopen-btn" disabled={isBusy} onClick={() => { reopenMutation.mutate(annotation.id); onClose(); }}>
-                {isBusy ? "Processing…" : "↩ Reopen"}
-              </button>
-            : <button className="hm-resolve-btn" disabled={isBusy} onClick={() => { resolveMutation.mutate(annotation.id); onClose(); }}>
-                {isBusy ? "Processing…" : "✓ Mark as resolved"}
-              </button>
-          }
+          <div className="hm-prod-title">{p.name}</div>
+          {p.brand && <div className="hm-prod-tag">{p.brand}</div>}
+          {p.price != null && (
+            <div className="hm-prod-contact">฿{p.price.toLocaleString("th-TH")}</div>
+          )}
         </div>
-      )}
+      ))}
     </div>
   );
 }

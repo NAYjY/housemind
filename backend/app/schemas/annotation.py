@@ -1,10 +1,5 @@
 """
 app/schemas/annotation.py — HouseMind
-Pydantic v2 request/response schemas.
-
-Changes vs original:
-  - Added AnnotationUpdateRequest: move pin position + optionally link a product.
-    Merges figmaTem's POST /annotations/move/<id> {x, y} into a single PATCH.
 """
 from __future__ import annotations
 
@@ -14,15 +9,12 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# ── Annotation schemas ────────────────────────────────────────────────────────
-
 class AnnotationSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     image_id: UUID
-    linked_product_id: UUID | None
-    thumbnail_url: str
+    object_id: int
     position_x: float = Field(ge=0.0, le=1.0)
     position_y: float = Field(ge=0.0, le=1.0)
     created_by: UUID | None
@@ -32,9 +24,8 @@ class AnnotationSummary(BaseModel):
 
 
 class CreateAnnotationRequest(BaseModel):
-    """Body for POST /api/v1/annotations"""
     image_id: UUID
-    linked_product_id: UUID | None = None
+    object_id: int = Field(ge=0, le=200)
     position_x: float = Field(ge=0.0, le=1.0)
     position_y: float = Field(ge=0.0, le=1.0)
     label: str | None = Field(default=None, max_length=512)
@@ -42,30 +33,17 @@ class CreateAnnotationRequest(BaseModel):
 
 
 class AnnotationUpdateRequest(BaseModel):
-    """
-    Body for PATCH /api/v1/annotations/{id}/move
-    Merges figmaTem's move endpoint into HouseMind coordinate system.
-    position_x / position_y are normalised [0.0, 1.0] — NOT pixels.
-    linked_product_id can be updated in the same call (null = unlink product).
-    All fields optional so client can send only what changed.
-    """
     position_x: float | None = Field(default=None, ge=0.0, le=1.0)
     position_y: float | None = Field(default=None, ge=0.0, le=1.0)
-    linked_product_id: UUID | None = None
-    # Sentinel: if True, explicitly unlinks the product even if linked_product_id
-    # is omitted. Avoids ambiguity between "not sending" vs "intentionally null".
-    unlink_product: bool = False
 
 
 class AnnotationDetail(AnnotationSummary):
-    """Full annotation payload — returned on single-annotation fetch."""
     label: str | None = None
     note: str | None = None
     updated_at: datetime
 
 
 class ResolveAnnotationRequest(BaseModel):
-    """Body for PATCH /api/v1/annotations/{id}/resolve"""
     note: str | None = None
 
 
@@ -86,15 +64,31 @@ class ProductDetail(BaseModel):
     specs: dict | None = None
 
 
+# ── Object product schemas ────────────────────────────────────────────────────
+
+class ObjectProductCreate(BaseModel):
+    project_id: UUID
+    product_id: UUID
+
+
+class ObjectProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    project_id: UUID
+    product_id: UUID
+    created_at: datetime
+    product: ProductDetail | None = None
+
+
 # ── Scraper schema ────────────────────────────────────────────────────────────
 
 class ScrapeImagesResponse(BaseModel):
-    """Response for GET /api/v1/products/scrape-images"""
     images: list[str]
     source_url: str
 
 
-# ── Image URL refresh schema ──────────────────────────────────────────────────
+# ── Image URL schemas ─────────────────────────────────────────────────────────
 
 class RefreshedImageUrl(BaseModel):
     image_id: UUID
@@ -102,8 +96,6 @@ class RefreshedImageUrl(BaseModel):
     expires_in: int
     model_config = ConfigDict(from_attributes=True)
 
-
-# ── Upload schemas ────────────────────────────────────────────────────────────
 
 class UploadPresignRequest(BaseModel):
     project_id: UUID
@@ -138,5 +130,34 @@ class ProjectImageResponse(BaseModel):
     height_px: int | None
     display_order: int
     created_at: datetime
-    # Pre-signed URL is added in the endpoint layer, not on the model
     url: str | None = None
+
+
+# ── Product create/update schemas ─────────────────────────────────────────────
+
+class ProductCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=512)
+    brand: str | None = None
+    model: str | None = None
+    price: float | None = None
+    currency: str = "THB"
+    description: str | None = None
+    thumbnail_url: str | None = None   # direct URL option
+    specs: dict | None = None
+
+
+class ProductPresignRequest(BaseModel):
+    filename: str = Field(max_length=512)
+    content_type: str = Field(pattern=r"^image/(jpeg|png|webp|gif)$")
+
+
+class ProductPresignResponse(BaseModel):
+    upload_url: str
+    s3_key: str
+    expires_in: int = 900
+
+
+class ProductSearchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    items: list[ProductDetail]
+    total: int
