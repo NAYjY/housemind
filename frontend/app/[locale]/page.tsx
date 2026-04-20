@@ -1,85 +1,109 @@
-// app/[locale]/page.tsx — HouseMind landing page
-// Uses Link from i18n/routing so locale prefix is added automatically.
-// /th/workspace/demo/... instead of hardcoded /workspace/demo/...
+// app/page.tsx — HouseMind landing page
+// Mobile-first · Thai-primary · Loss-aversion framing
 
 import Link from "next/link";
 
 export default function LandingPage() {
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-        :root {
-          --stone-50:#FAFAF8; --stone-100:#F5F4F0; --stone-200:#E8E6E0;
-          --stone-300:#D4D1C7; --stone-500:#888780; --stone-900:#1A1A18;
-          --accent:#7F77DD; --gold:#C9A84C; --gold-light:#F5EDD4;
-        }
-        .hm-land { font-family:'DM Sans',sans-serif; background:#E8E6E0; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:32px 16px 64px; }
-        .hm-land-card { background:var(--stone-50); width:100%; max-width:430px; box-shadow:0 8px 40px rgba(0,0,0,0.18); overflow:hidden; }
-        .hm-land-hero { background:var(--stone-900); padding:40px 28px 36px; }
-        .hm-land-wordmark { font-family:'DM Serif Display',serif; font-size:38px; color:#fff; letter-spacing:-0.02em; line-height:1; margin-bottom:6px; }
-        .hm-land-wordmark span { color:var(--gold); }
-        .hm-land-sub { font-size:11px; color:rgba(255,255,255,0.38); letter-spacing:0.16em; text-transform:uppercase; margin-bottom:28px; }
-        .hm-land-desc { font-size:14px; color:rgba(255,255,255,0.55); line-height:1.7; max-width:320px; margin-bottom:28px; }
-        .hm-land-cta { display:inline-block; background:var(--gold); color:#3A2E10; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; padding:12px 22px; border-radius:6px; text-decoration:none; }
-        .hm-land-body { padding:24px 24px 32px; }
-        .hm-land-features { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:28px; }
-        .hm-land-feat { background:var(--stone-100); border-radius:10px; padding:14px; border:0.5px solid var(--stone-200); }
-        .hm-land-feat-icon { font-size:20px; margin-bottom:6px; }
-        .hm-land-feat-title { font-size:12px; font-weight:500; color:var(--stone-900); margin-bottom:2px; }
-        .hm-land-feat-desc { font-size:10px; color:var(--stone-500); line-height:1.5; }
-        .hm-land-roles { display:flex; gap:6px; flex-wrap:wrap; }
-        .hm-land-role { font-size:10px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; padding:4px 10px; border-radius:20px; border:0.5px solid var(--stone-200); color:var(--stone-500); background:var(--stone-100); }
-      `}</style>
+      
+      <div className="lp">
+        <div className="lp-inner">
 
-      <div className="hm-land">
-        <div className="hm-land-card">
-          <div className="hm-land-hero">
-            <div className="hm-land-wordmark">House<span>Mind</span></div>
-            <div className="hm-land-sub">Visual decisions workspace</div>
-            <div className="hm-land-desc">
-              แพลตฟอร์มสำหรับทีมก่อสร้าง — ทำหมายเหตุบนรูปภาพ เชื่อมโยงสินค้า และตัดสินใจร่วมกัน
-            </div>
-            {/* Link from i18n/routing — adds /th/ prefix automatically */}
-            <Link
-              href="/login"
-              className="hm-land-cta"
-            >
-              Sign In to Workspace →
-            </Link>
+          {/* Nav */}
+          <div className="lp-nav">
+            <div className="lp-brand">House<span>Mind</span></div>
+            <Link href="/login" className="lp-nav-login">เข้าสู่ระบบ →</Link>
           </div>
 
-          <div className="hm-land-body">
-            <div className="hm-land-features">
+          {/* Hero */}
+          <div className="lp-hero">
+            <div className="lp-badge"><div className="lp-badge-dot" />สำหรับสถาปนิกและทีมก่อสร้างไทย</div>
+            <h1 className="lp-h1">ทุกการตัดสินใจ<br />อยู่บนภาพ<br /><em>ไม่ใช่ในเอกสาร</em></h1>
+            <div className="lp-h1-en">Every decision, on the image — not in a document.</div>
+            <p className="lp-sub">เจ้าของบ้านอนุมัติกระเบื้องผิดเพราะ<strong>ดู PDF ไม่เข้าใจ</strong><br />ปัญหานั้นจบได้ตั้งแต่วันแรก</p>
+            <div className="lp-cta-row">
+              <Link href="/login" className="lp-btn-main">เข้าสู่ระบบ</Link>
+              <Link href="/workspace/demo/demo-image?src=https://images.unsplash.com/photo-1555041469-a586c61ea9bc&readOnly=true" className="lp-btn-demo">ดูตัวอย่าง</Link>
+            </div>
+          </div>
+
+          <div className="lp-divider" />
+
+          {/* Pain */}
+          <div className="lp-section">
+            <div className="lp-kicker">ปัญหาที่เจอทุกโครงการ</div>
+            <h2 className="lp-h2">คุณจัดการการตัดสินใจผ่านช่องทางที่ไม่ได้ออกแบบมาเพื่องานนี้</h2>
+            <p className="lp-cap">Line, PDF, Voice note — กระจัดกระจาย ไม่มีใครรับผิดชอบชัดเจน</p>
+            <div className="lp-cards">
               {[
-                { icon: "📍", title: "Annotate",      desc: "Tap any image to drop a pin" },
-                { icon: "🎞", title: "Filmstrip",     desc: "Manage multiple reference images" },
-                { icon: "✅", title: "Resolve",       desc: "Track decisions to completion" },
-                { icon: "🔗", title: "Link Products", desc: "Attach specs and pricing" },
-              ].map((f) => (
-                <div key={f.title} className="hm-land-feat">
-                  <div className="hm-land-feat-icon">{f.icon}</div>
-                  <div className="hm-land-feat-title">{f.title}</div>
-                  <div className="hm-land-feat-desc">{f.desc}</div>
+                { icon: "💬", title: "Line / WhatsApp", desc: "ข้อความที่เห็นด้วยกับสีผนัง ถูกทับด้วยสติกเกอร์ 3 วันให้หลัง ไม่มีใครจำได้ว่าตกลงอะไร", tag: "ไม่มีบันทึกที่ชัดเจน" },
+                { icon: "📄", title: "PDF สเปค", desc: "เห็นแต่รหัสสินค้า ไม่เห็นภาพ ไม่รู้ว่าวางตรงไหน อนุมัติไปเพราะเชื่อใจ ไม่ใช่เพราะเข้าใจ", tag: "เข้าใจผิดบ่อย" },
+                { icon: "🎙", title: "Voice note", desc: "ผู้รับเหมาฟัง 2 นาที ทำงานตาม แต่สถาปนิกหมายถึงอีกจุด ต้องรื้อใหม่", tag: "ค่าใช้จ่ายสูงขึ้น" },
+              ].map((item) => (
+                <div key={item.title} className="lp-card">
+                  <div className="lp-card-icon">{item.icon}</div>
+                  <div>
+                    <div className="lp-card-title">{item.title}</div>
+                    <div className="lp-card-desc">{item.desc}</div>
+                    <span className="lp-tag-red">{item.tag}</span>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
 
-            <div style={{ fontSize: 10, color: "var(--stone-500)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-              Roles
-            </div>
-            <div className="hm-land-roles">
-              {["Architect", "Contractor", "Homeowner", "Supplier"].map((r) => (
-                <span key={r} className="hm-land-role">{r}</span>
+          <div className="lp-divider" />
+
+          {/* Solve */}
+          <div className="lp-section">
+            <div className="lp-kicker">HouseMind แก้ตรงจุด</div>
+            <h2 className="lp-h2">หมุดบนภาพ แทนคำอธิบายที่เข้าใจผิดได้</h2>
+            <p className="lp-cap">ทีมก่อสร้างทุกคนเห็นภาพเดียวกัน ตัดสินใจบนบริบทเดียวกัน</p>
+            <div className="lp-cards">
+              {[
+                { num: "1", title: "แตะบนรูปห้อง ปักหมุดได้เลย", desc: "ระบุตำแหน่งสินค้าบนภาพจริง เจ้าของบ้านเห็นปุ๊บเข้าใจปั๊บ ไม่ต้องตีความ", tag: "เข้าใจทันที" },
+                { num: "2", title: "สเปค ราคา รูปสินค้า อยู่ในหมุดเดียว", desc: "ไม่ต้องเปิด PDF คู่กัน ทุกอย่างอยู่ที่เดิม คลิกเดียวเห็นทั้งหมด", tag: "ข้อมูลครบในที่เดียว" },
+                { num: "3", title: "กด Resolve เมื่อตกลงแล้ว", desc: "ประวัติการตัดสินใจชัดเจน ไม่มีใครย้อนกลับมาเถียงภายหลัง", tag: "ติดตามได้ตลอด" },
+              ].map((item) => (
+                <div key={item.num} className="lp-card">
+                  <div className="lp-card-num">{item.num}</div>
+                  <div>
+                    <div className="lp-card-title">{item.title}</div>
+                    <div className="lp-card-desc">{item.desc}</div>
+                    <span className="lp-tag-green">{item.tag}</span>
+                  </div>
+                </div>
               ))}
             </div>
+          </div>
 
-            <div style={{ marginTop: 24 }}>
-              <Link href="/login" style={{ fontSize: 12, color: "var(--stone-500)", textDecoration: "none" }}>
-                Sign in →
-              </Link>
+          <div className="lp-divider" />
+
+          {/* Roles */}
+          <div className="lp-section" style={{ paddingBottom: "20px" }}>
+            <div className="lp-roles-label">เข้าถึงได้ทุกบทบาทในโครงการ</div>
+            <div className="lp-roles-row">
+              {["สถาปนิก", "ผู้รับเหมา", "เจ้าของบ้าน", "ผู้จัดจำหน่าย"].map((r) => (
+                <span key={r} className="lp-role-pill">{r}</span>
+              ))}
             </div>
           </div>
+
+          {/* Footer CTA */}
+          <div className="lp-footer-cta">
+            <div className="lp-footer-eyebrow">พร้อมแล้ว?</div>
+            <div className="lp-footer-h">ทดลองใช้กับโครงการจริงได้เลย</div>
+            <div className="lp-footer-sub">สถาปนิกที่ได้รับลิงก์เชิญสามารถเข้าใช้งานได้ทันที ไม่ต้องติดตั้งแอป</div>
+            <Link href="/login" className="lp-footer-btn">เริ่มกันเลย →</Link>
+          </div>
+
+          {/* Bottom bar */}
+          <div className="lp-bottom-bar">
+            <div className="lp-bottom-brand">House<span>Mind</span></div>
+            <div className="lp-bottom-copy">ระบบจัดการโครงการก่อสร้าง</div>
+          </div>
+
         </div>
       </div>
     </>
