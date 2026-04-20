@@ -6,7 +6,7 @@
 // Long press pin → delete confirmation
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   useAnnotations,
   useCreateAnnotation,
@@ -100,7 +100,18 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
   const createMutation = useCreateAnnotation(activeSlide.imageId, projectId);
   const deleteMutation = useDeleteAnnotation(activeSlide.imageId);
   const linkProduct = useLinkProduct(projectId);
-
+  const moveMutation = useMutation({
+    mutationFn: async ({ id, normX, normY }: { id: string; normX: number; normY: number }) => {
+        const res = await authFetch(`${API}/annotations/${id}/move?project_id=${projectId}`, {        method: "PATCH",
+        body: JSON.stringify({ position_x: normX, position_y: normY }),
+      });
+      if (!res.ok) throw new Error("Failed to move annotation");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["annotations", activeSlide.imageId] });
+    },
+  });
   const activeAnnotation = activePinId
     ? annotations.find((a) => a.id === activePinId) ?? null
     : null;
@@ -313,6 +324,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
             activeId={activePinId}
             onSingleTap={(id) => setActivePinId((prev) => prev === id ? null : id)}
             onLongPress={(ann) => setDeleteTarget(ann)}
+            onMove={(id, normX, normY) => moveMutation.mutate({ id, normX, normY })}
           />
 
           {createMutation.isPending && (
@@ -539,14 +551,22 @@ function PinsLayer({
   activeId,
   onSingleTap,
   onLongPress,
+  onMove,
 }: {
   annotations: Annotation[];
   activeId: string | null;
   onSingleTap: (id: string) => void;
   onLongPress: (ann: Annotation) => void;
+  onMove: (id: string, normX: number, normY: number) => void;
 }) {
   const timerRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const startPos = useRef<Record<string, { x: number; y: number }>>({});
+  const dragging = useRef<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Find the canvas parent for coordinate calculation
+  const getContainer = () =>
+    document.querySelector(".hm-canvas-wrap") as HTMLDivElement | null;
 
   return <>
     {annotations.map((ann, i) => {
@@ -558,26 +578,64 @@ function PinsLayer({
         <div
           key={ann.id}
           className="hm-pin"
-          style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%` }}
+          style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%`, touchAction: "none" }}
           onPointerDown={(e) => {
             e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
             startPos.current[ann.id] = { x: e.clientX, y: e.clientY };
+            dragging.current = null;
             timerRefs.current[ann.id] = setTimeout(() => {
               onLongPress(ann);
+              dragging.current = null;
             }, 600);
+          }}
+          onPointerMove={(e) => {
+            e.stopPropagation();
+            const start = startPos.current[ann.id];
+            if (!start) return;
+            const moved = Math.abs(e.clientX - start.x) > 6 || Math.abs(e.clientY - start.y) > 6;
+            if (moved) {
+              if (timerRefs.current[ann.id]) {
+                clearTimeout(timerRefs.current[ann.id]);
+              }
+              dragging.current = ann.id;
+              // Move the pin visually
+              const container = getContainer();
+              if (!container) return;
+              const rect = container.getBoundingClientRect();
+              const normX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              const normY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+              const el = e.currentTarget as HTMLDivElement;
+              el.style.left = `${normX * 100}%`;
+              el.style.top = `${normY * 100}%`;
+            }
           }}
           onPointerUp={(e) => {
             e.stopPropagation();
             const start = startPos.current[ann.id];
+            const wasDragging = dragging.current === ann.id;
             const moved = start
               ? Math.abs(e.clientX - start.x) > 6 || Math.abs(e.clientY - start.y) > 6
               : false;
             if (timerRefs.current[ann.id]) {
               clearTimeout(timerRefs.current[ann.id]);
-              if (!moved) onSingleTap(ann.id);
             }
+            if (wasDragging && moved) {
+              const container = getContainer();
+              if (container) {
+                const rect = container.getBoundingClientRect();
+                const normX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const normY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                onMove(ann.id, normX, normY);
+              }
+            } else if (!moved) {
+              onSingleTap(ann.id);
+            }
+            dragging.current = null;
           }}
-          onPointerLeave={() => clearTimeout(timerRefs.current[ann.id])}
+          onPointerLeave={() => {
+            // Don't cancel — pointer capture handles this
+          }}
         >
           <div
             className={`hm-pin-bubble ${isActive ? "active" : ""}`}
