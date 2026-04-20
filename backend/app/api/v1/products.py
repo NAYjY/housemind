@@ -211,35 +211,37 @@ async def get_product(
 
 # ── GET /products?project_id= ─────────────────────────────────────────────────
 
+# GET /products?project_id=&object_id= (add optional object_id filter)
 @router.get("", response_model=list[ProductDetail])
 async def list_project_products(
     project_id: uuid.UUID = Query(...),
+    object_id: int | None = Query(default=None),  # add this
     db: AsyncSession = Depends(get_db),
     _user: dict = Depends(require_project_member),
 ) -> list[ProductDetail]:
-    """All products linked to a project via object_products."""
-    result = await db.execute(
+    stmt = (
         select(Product)
         .join(ObjectProduct, ObjectProduct.product_id == Product.id)
         .where(ObjectProduct.project_id == project_id)
-        .order_by(ObjectProduct.created_at.desc())
     )
+    if object_id is not None:
+        stmt = stmt.where(ObjectProduct.object_id == object_id)
+    stmt = stmt.order_by(ObjectProduct.created_at.desc())
+    result = await db.execute(stmt)
     return [_sign(p) for p in result.scalars().all()]
 
 
-# ── POST /products/link ───────────────────────────────────────────────────────
-
+# POST /products/link — now requires object_id
 @router.post("/link", response_model=ObjectProductResponse, status_code=status.HTTP_201_CREATED)
 async def link_product_to_project(
     body: ObjectProductCreate,
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_member),
 ) -> ObjectProductResponse:
-    """Link a product to a project (attach to project's product pool)."""
-    # check not already linked
     existing = await db.execute(
         select(ObjectProduct).where(
             ObjectProduct.project_id == body.project_id,
+            ObjectProduct.object_id == body.object_id,  # add this
             ObjectProduct.product_id == body.product_id,
         )
     )
@@ -249,6 +251,7 @@ async def link_product_to_project(
     op = ObjectProduct(
         id=uuid.uuid4(),
         project_id=body.project_id,
+        object_id=body.object_id,  # add this
         product_id=body.product_id,
     )
     db.add(op)
@@ -260,6 +263,7 @@ async def link_product_to_project(
     return ObjectProductResponse(
         id=op.id,
         project_id=op.project_id,
+        object_id=op.object_id,  # add this
         product_id=op.product_id,
         created_at=op.created_at,
         product=_sign(prod) if prod else None,

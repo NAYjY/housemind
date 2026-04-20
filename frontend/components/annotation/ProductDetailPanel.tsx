@@ -37,7 +37,7 @@ export function ProductDetailPanel({
   onClose,
   onAttachProduct,
 }: Props) {
-  const { data: products = [], isLoading } = useProjectProducts(projectId);
+  const { data: products = [], isLoading } = useProjectProducts(projectId, annotation.object_id);
   const resolveMutation = useResolveAnnotation(imageId);
   const reopenMutation = useReopenAnnotation(imageId);
   const isResolved = !!annotation.resolved_at;

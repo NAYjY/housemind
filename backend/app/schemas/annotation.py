@@ -68,6 +68,7 @@ class ProductDetail(BaseModel):
 
 class ObjectProductCreate(BaseModel):
     project_id: UUID
+    object_id: int = Field(ge=0, le=200)
     product_id: UUID
 
 
@@ -76,6 +77,7 @@ class ObjectProductResponse(BaseModel):
 
     id: UUID
     project_id: UUID
+    object_id: int
     product_id: UUID
     created_at: datetime
     product: ProductDetail | None = None

@@ -258,7 +258,10 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         <ProductPickerModal
           projectId={projectId}
           onSelect={async (productId) => {
-            await linkProduct.mutateAsync(productId);
+            await linkProduct.mutateAsync({ 
+              productId, 
+              objectId: activeAnnotation?.object_id ?? 0 
+            });
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}
@@ -581,7 +584,6 @@ function PinsLayer({
           style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%`, touchAction: "none" }}
           onPointerDown={(e) => {
             e.stopPropagation();
-            e.currentTarget.setPointerCapture(e.pointerId);
             startPos.current[ann.id] = { x: e.clientX, y: e.clientY };
             dragging.current = null;
             timerRefs.current[ann.id] = setTimeout(() => {
@@ -593,12 +595,16 @@ function PinsLayer({
             e.stopPropagation();
             const start = startPos.current[ann.id];
             if (!start) return;
+            if (e.buttons === 0) return;
             const moved = Math.abs(e.clientX - start.x) > 6 || Math.abs(e.clientY - start.y) > 6;
             if (moved) {
               if (timerRefs.current[ann.id]) {
                 clearTimeout(timerRefs.current[ann.id]);
               }
-              dragging.current = ann.id;
+              if (dragging.current !== ann.id) {
+                dragging.current = ann.id;
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }
               // Move the pin visually
               const container = getContainer();
               if (!container) return;

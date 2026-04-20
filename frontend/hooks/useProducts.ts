@@ -41,11 +41,14 @@ export function useMyProducts() {
 }
 
 // Project products (all products linked to project)
-export function useProjectProducts(projectId: string) {
+// useProjectProducts — add optional object_id filter
+export function useProjectProducts(projectId: string, objectId?: number | null) {
   return useQuery<ProductDetail[]>({
-    queryKey: ["products", "project", projectId],
+    queryKey: ["products", "project", projectId, objectId ?? "all"],
     queryFn: async () => {
-      const res = await authFetch(`${API}/products?project_id=${projectId}`);
+      const params = new URLSearchParams({ project_id: projectId });
+      if (objectId != null) params.set("object_id", String(objectId));
+      const res = await authFetch(`${API}/products?${params}`);
       if (!res.ok) throw new Error("Failed to fetch project products");
       return res.json();
     },
@@ -115,16 +118,20 @@ export function useProductThumbnailUpload() {
   });
 }
 
-// Link product to project
+// useLinkProduct — now needs object_id
 export function useLinkProduct(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (productId: string) => {
+    mutationFn: async ({ productId, objectId }: { productId: string; objectId: number }) => {
       const res = await authFetch(`${API}/products/link`, {
         method: "POST",
-        body: JSON.stringify({ project_id: projectId, product_id: productId }),
+        body: JSON.stringify({ 
+          project_id: projectId, 
+          object_id: objectId,   // add this
+          product_id: productId 
+        }),
       });
-      if (res.status === 409) return; // already linked, fine
+      if (res.status === 409) return;
       if (!res.ok) throw new Error("Failed to link product");
       return res.json();
     },
