@@ -56,13 +56,13 @@ export function useDeleteAnnotation(imageId: string) {
   const deleteAnnotation = useAnnotationStore((s) => s.deleteAnnotation);
 
   return useMutation({
-    mutationFn: async (annotationId: string) => {
-      const res = await authFetch(`${API}/annotations/${annotationId}`, {
+    mutationFn: async ({ annotationId, projectId }: { annotationId: string; projectId: string }) => {
+      const res = await authFetch(`${API}/annotations/${annotationId}?project_id=${projectId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete annotation");
     },
-    onSuccess: (_, annotationId) => {
+    onSuccess: (_, { annotationId }) => {
       deleteAnnotation(annotationId, imageId);
       qc.invalidateQueries({ queryKey: ["annotations", imageId] });
     },

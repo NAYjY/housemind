@@ -235,7 +235,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           annotation={deleteTarget}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => {
-            deleteMutation.mutate(deleteTarget.id);
+            deleteMutation.mutate({ annotationId: deleteTarget.id, projectId });
             setDeleteTarget(null);
             if (activePinId === deleteTarget.id) setActivePinId(null);
           }}
