@@ -8,12 +8,24 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    full_name: str = Field(min_length=1, max_length=255)
+    role: str = Field(pattern=r"^(architect|contractor|homeowner|supplier)$")
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 class InviteCreateRequest(BaseModel):
-    """Body for POST /api/v1/invites — architect sends an invite"""
+    """Architect creates a user account directly — no magic link."""
     project_id: UUID
     invitee_email: EmailStr
     invitee_role: str = Field(pattern=r"^(contractor|homeowner|supplier)$")
+    invitee_name: str = Field(min_length=1, max_length=255)
+    temp_password: str = Field(min_length=8)
 
 
 class InviteCreateResponse(BaseModel):

@@ -172,7 +172,7 @@ test("RBAC · Create invite: architect → 201", async ({ request }) => {
   const res = await request.post(`${API_BASE}/invites`, {
     data: {
       project_id: PROJECT_ID,
-      invitee_email: `rbac-test-${Date.now()}@housemind.test`,
+      invitee_email: `rbac-test-${Date.now()}@housemind.com`,
       invitee_role: "homeowner",
     },
     headers: authHeaders("architect"),
@@ -187,7 +187,7 @@ for (const role of ["contractor", "homeowner", "supplier"] as Role[]) {
     const res = await request.post(`${API_BASE}/invites`, {
       data: {
         project_id: PROJECT_ID,
-        invitee_email: `rbac-blocked-${Date.now()}@housemind.test`,
+        invitee_email: `rbac-blocked-${Date.now()}@housemind.com`,
         invitee_role: "homeowner",
       },
       headers: authHeaders(role),

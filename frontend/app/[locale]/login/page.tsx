@@ -22,10 +22,11 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("architect@housemind.test");
+  const [email, setEmail] = useState("architect@housemind.com");
   const [role, setRole] = useState<Role>("architect");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [password, setPassword] = useState("");
 
   async function handleLogin() {
     if (!email.trim()) return;
@@ -33,10 +34,10 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch(`${API}/dev/login`, {
+      const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), role }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       if (!res.ok) {
@@ -46,9 +47,10 @@ export default function LoginPage() {
 
       const data = await res.json();
       setToken(data.access_token);
-
+      // router.push("/workspace/demo/demo-image?src=https://images.unsplash.com/photo-1555041469-a586c61ea9bc&readOnly=false")
       // Redirect to workspace demo or home
-      router.push("/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001");    } catch (err: unknown) {
+      router.push("/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001");
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
@@ -204,8 +206,7 @@ export default function LoginPage() {
           </div>
 
           <div className="login-body">
-            <div className="login-dev-badge">⚠ Dev Login — not for production</div>
-
+            
             <div className="login-label">Email</div>
             <input
               className="login-input"
@@ -213,6 +214,16 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            />
+
+            <div className="login-label">Password</div>
+            <input
+              className="login-input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             />
 

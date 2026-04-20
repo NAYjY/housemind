@@ -39,6 +39,9 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    password_hash: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
 
     # Relationships
     projects: Mapped[list["Project"]] = relationship(  # type: ignore[name-defined]

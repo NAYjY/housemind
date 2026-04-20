@@ -46,7 +46,7 @@ async function createInviteViaApi(role: string): Promise<string> {
     },
     body: JSON.stringify({
       project_id: PROJECT_ID,
-      invitee_email: `test-${role}-${Date.now()}@housemind.test`,
+      invitee_email: `test-${role}-${Date.now()}@housemind.com`,
       invitee_role: role,
     }),
   });
@@ -208,7 +208,7 @@ test.describe("Critical path — Magic-link invite redemption", () => {
       },
       data: {
         project_id: PROJECT_ID,
-        invitee_email: `homeowner-${Date.now()}@housemind.test`,
+        invitee_email: `homeowner-${Date.now()}@housemind.com`,
         invitee_role: "homeowner",
       },
     });

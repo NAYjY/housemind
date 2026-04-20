@@ -2,7 +2,7 @@
 // Uses Link from i18n/routing so locale prefix is added automatically.
 // /th/workspace/demo/... instead of hardcoded /workspace/demo/...
 
-import { Link } from "@/i18n/routing";
+import Link from "next/link";
 
 export default function LandingPage() {
   return (

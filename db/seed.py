@@ -23,6 +23,7 @@ import os
 import sys
 import uuid
 from datetime import datetime, timezone
+import bcrypt
 
 # Allow running from project root or backend directory
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
@@ -35,6 +36,9 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://housemind:housemind@localhost:5432/housemind_dev",
 )
 
+def _hash(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
 # ── Fixed UUIDs (deterministic — match TEST_* env vars in CI) ────────────────
 ARCHITECT_ID   = uuid.UUID("00000001-0000-0000-0000-000000000001")
 CONTRACTOR_ID  = uuid.UUID("00000001-0000-0000-0000-000000000002")
@@ -44,6 +48,12 @@ PROJECT_ID     = uuid.UUID("00000002-0000-0000-0000-000000000001")
 IMAGE_ID       = uuid.UUID("00000003-0000-0000-0000-000000000001")
 PRODUCT_ID     = uuid.UUID("00000004-0000-0000-0000-000000000001")
 ANNOTATION_ID  = uuid.UUID("00000005-0000-0000-0000-000000000001")
+arch_pw=_hash("architect123")
+contr_pw=_hash("contractor123")
+home_pw=_hash("homeowner123")
+supp_pw=_hash("supplier123")
+
+
 
 
 async def seed(session: AsyncSession) -> None:
@@ -56,18 +66,22 @@ async def seed(session: AsyncSession) -> None:
 
     # ── Users ────────────────────────────────────────────────────────────────
     await session.execute(text("""
-        INSERT INTO users (id, email, full_name, role, preferred_language)
+        INSERT INTO users (id, email, full_name, role, preferred_language, password_hash)
         VALUES
-          (:architect_id,  'architect@housemind.test',  'สมชาย สถาปนิก',  'architect',  'th'),
-          (:contractor_id, 'contractor@housemind.test', 'สมหญิง ผูรับเหมา', 'contractor', 'th'),
-          (:homeowner_id,  'homeowner@housemind.test',  'สมศรี เจาของบาน',  'homeowner',  'th'),
-          (:supplier_id,   'supplier@housemind.test',   'บริษัท วัสดุ จำกัด', 'supplier', 'th')
+          (:architect_id,  'architect@housemind.com',  'สมชาย สถาปนิก',  'architect',  'th', :arch_pw),
+          (:contractor_id, 'contractor@housemind.com', 'สมหญิง ผูรับเหมา', 'contractor', 'th', :contr_pw),
+          (:homeowner_id,  'homeowner@housemind.com',  'สมศรี เจาของบาน',  'homeowner',  'th', :home_pw),
+          (:supplier_id,   'supplier@housemind.com',   'บริษัท วัสดุ จำกัด', 'supplier', 'th', :supp_pw)
         ON CONFLICT (id) DO NOTHING
     """), {
         "architect_id": ARCHITECT_ID,
         "contractor_id": CONTRACTOR_ID,
         "homeowner_id": HOMEOWNER_ID,
         "supplier_id": SUPPLIER_ID,
+        "arch_pw": arch_pw,
+        "contr_pw": contr_pw,
+        "home_pw": home_pw,
+        "supp_pw": supp_pw,
     })
     print("  ✓ Users seeded")
 
@@ -142,17 +156,17 @@ async def seed(session: AsyncSession) -> None:
 
     # ── Invite tokens ─────────────────────────────────────────────────────────
     for invitee_id, email, role in [
-        (CONTRACTOR_ID, "contractor@housemind.test", "contractor"),
-        (HOMEOWNER_ID,  "homeowner@housemind.test",  "homeowner"),
+        (CONTRACTOR_ID, "contractor@housemind.com", "contractor"),
+        (HOMEOWNER_ID,  "homeowner@housemind.com",  "homeowner"),
     ]:
         await session.execute(text("""
             INSERT INTO invite_requests (
                 id, project_id, invited_by, invitee_email, invitee_role,
-                magic_link_token, status, expires_at
+                status, expires_at
             )
             VALUES (
                 gen_random_uuid(), :project_id, :architect_id, :email, :role,
-                :token, 'accepted', NOW() + INTERVAL '72 hours'
+                'accepted', NOW() + INTERVAL '72 hours'
             )
             ON CONFLICT DO NOTHING
         """), {
