@@ -1,10 +1,5 @@
 "use client";
 
-// components/workspace/WorkspaceShell.tsx — HouseMind
-// Long press empty canvas → fan emoji menu → create annotation → panel opens
-// Single tap pin → product panel
-// Long press pin → delete confirmation
-
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import {
@@ -17,14 +12,14 @@ import {
 import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectImages } from "@/hooks/useProjectImages";
-import { useProjectProducts, useLinkProduct } from "@/hooks/useProducts";
+import { useProjectProducts, useLinkProduct, type ProductDetail } from "@/hooks/useProducts";
 import { authFetch } from "@/lib/auth";
 import { ProductDetailPanel } from "@/components/annotation/ProductDetailPanel";
 import { ProductPickerModal } from "@/components/annotation/ProductPickerModal";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
-// Object ID to emoji + label mapping — edit here to change icons
+// Edit these to change emoji categories
 const OBJECT_DEFS: Record<number, { emoji: string; label: string }> = {
   101: { emoji: "😊", label: "Smile" },
   102: { emoji: "⭐", label: "Star" },
@@ -51,7 +46,6 @@ const PIN_COLORS = ["#7F77DD", "#C9A84C", "#639922", "#E24B4A", "#888780", "#534
 export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: Props) {
   const auth = useAuth();
   const readOnly = forceReadOnly || auth.isReadOnly;
-  const qc = useQueryClient();
 
   // ── Slides ────────────────────────────────────────────────────────────────
   const [slides, setSlides] = useState<Slide[]>([{ imageId, url: imageUrl, label: "Reference 1" }]);
@@ -79,20 +73,25 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
-  // Fan menu state
+  // Fan menu
   const [fanVisible, setFanVisible] = useState(false);
   const [fanPos, setFanPos] = useState({ x: 0, y: 0 });
   const [pendingPos, setPendingPos] = useState({ normX: 0, normY: 0 });
 
-  // Delete confirm state
+  // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState<Annotation | null>(null);
 
-  // Active pin for product panel
+  // Active pin (for product grid filter)
   const [activePinId, setActivePinId] = useState<string | null>(null);
+
+  // Active product (for full detail panel)
+  const [activeProduct, setActiveProduct] = useState<ProductDetail | null>(null);
 
   // Product picker modal
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [showAllProducts, setShowAllProducts] = useState(false);
+
+  // Show all products toggle
+  const [showAll, setShowAll] = useState(false);
 
   // ── Annotations ───────────────────────────────────────────────────────────
   useAnnotations(activeSlide.imageId);
@@ -129,7 +128,6 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     };
   }, []);
 
-  // Long press on empty canvas
   const canvasLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasTouchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -162,7 +160,6 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     }
   };
 
-  // Pick emoji from fan menu
   const handleEmojiPick = async (objectId: number) => {
     setFanVisible(false);
     const ann = await createMutation.mutateAsync({
@@ -171,6 +168,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
       objectId,
     });
     setActivePinId(ann.id);
+    setShowAll(false);
   };
 
   // Image upload
@@ -178,7 +176,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     if (!auth.isAuthenticated) { setUploadError("Sign in to upload."); return; }
     setUploading(true); setUploadError("");
     try {
-      const presignRes = await authFetch(`${API}/images/upload-url?project_id=${projectId}`, {
+      const presignRes = await authFetch(`${API}/images/upload-url`, {
         method: "POST",
         body: JSON.stringify({ project_id: projectId, filename: file.name, content_type: file.type }),
       });
@@ -186,7 +184,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
       const { upload_url, s3_key } = await presignRes.json();
       const s3Res = await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       if (!s3Res.ok) throw new Error("S3 upload failed");
-      const confirmRes = await authFetch(`${API}/images/confirm?project_id=${projectId}`, {
+      const confirmRes = await authFetch(`${API}/images/confirm`, {
         method: "POST",
         body: JSON.stringify({ project_id: projectId, s3_key, original_filename: file.name, mime_type: file.type }),
       });
@@ -206,7 +204,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     if (!url) return;
     if (auth.isAuthenticated) {
       try {
-        const res = await authFetch(`${API}/images/from-url?project_id=${projectId}`, {
+        const res = await authFetch(`${API}/images/from-url`, {
           method: "POST",
           body: JSON.stringify({ project_id: projectId, url, original_filename: url.split("/").pop() }),
         });
@@ -223,11 +221,6 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     setCurrentSlide(idx);
     setRefInput(""); setFilmExpanded(false);
   };
-
-  // Get object_id of active annotation for filtering products
-  const activeObjectId = activeAnnotation?.object_id ?? null;
-  // Unique object_ids visible on current image
-  const visibleObjectIds = [...new Set(annotations.map((a) => a.object_id))];
 
   return (
     <>
@@ -258,13 +251,24 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         <ProductPickerModal
           projectId={projectId}
           onSelect={async (productId) => {
-            await linkProduct.mutateAsync({ 
-              productId, 
-              objectId: activeAnnotation?.object_id ?? 0 
+            await linkProduct.mutateAsync({
+              productId,
+              objectId: activeAnnotation?.object_id ?? 0,
             });
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {/* Product detail panel — full screen, shows when product card clicked */}
+      {activeProduct && (
+        <ProductDetailPanel
+          product={activeProduct}
+          annotation={activeAnnotation}
+          canResolve={auth.canResolve}
+          imageId={activeSlide.imageId}
+          onClose={() => setActiveProduct(null)}
         />
       )}
 
@@ -291,14 +295,8 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
             <div className="hm-proj-label">Project</div>
             <div className="hm-proj-name">
               <span>{projectId}</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-                <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
             </div>
           </div>
-          {!readOnly && (
-            <button className="hm-add-btn" onClick={() => setPickerOpen(true)}>+ Attach Product</button>
-          )}
         </div>
 
         {/* Canvas */}
@@ -325,7 +323,11 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           <PinsLayer
             annotations={annotations}
             activeId={activePinId}
-            onSingleTap={(id) => setActivePinId((prev) => prev === id ? null : id)}
+            onSingleTap={(id) => {
+              setActivePinId((prev) => prev === id ? null : id);
+              setShowAll(false);
+              setActiveProduct(null);
+            }}
             onLongPress={(ann) => setDeleteTarget(ann)}
             onMove={(id, normX, normY) => moveMutation.mutate({ id, normX, normY })}
           />
@@ -336,8 +338,16 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
           {slides.length > 1 && (
             <div className="hm-carousel-nav">
-              <button className="hm-c-btn" onClick={() => setCurrentSlide((i) => (i - 1 + slides.length) % slides.length)}>‹</button>
-              <button className="hm-c-btn" onClick={() => setCurrentSlide((i) => (i + 1) % slides.length)}>›</button>
+              <button className="hm-c-btn" onClick={() => {
+                setCurrentSlide((i) => (i - 1 + slides.length) % slides.length);
+                setActivePinId(null);
+                setActiveProduct(null);
+              }}>‹</button>
+              <button className="hm-c-btn" onClick={() => {
+                setCurrentSlide((i) => (i + 1) % slides.length);
+                setActivePinId(null);
+                setActiveProduct(null);
+              }}>›</button>
             </div>
           )}
 
@@ -378,40 +388,16 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           </div>
         </div>
 
-        {/* Product panel — shows when pin selected */}
-        {activeAnnotation && (
-          <ProductDetailPanel
-            annotation={activeAnnotation}
-            projectId={projectId}
-            canAttach={!readOnly && auth.canWrite}
-            canResolve={auth.canResolve}
-            imageId={activeSlide.imageId}
-            onClose={() => setActivePinId(null)}
-            onAttachProduct={() => setPickerOpen(true)}
-          />
-        )}
-
-        {/* Product grid — all visible products */}
-        {!activeAnnotation && (
-          <>
-            <div className="hm-section-header">
-              <div className="hm-section-title">
-                {showAllProducts ? "All Project Products" : "Products"}
-              </div>
-              <button
-                style={{ fontSize: 11, color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer" }}
-                onClick={() => setShowAllProducts((v) => !v)}
-              >
-                {showAllProducts ? "Filter by pin" : "Show all"}
-              </button>
-            </div>
-            <ProductGrid
-              projectId={projectId}
-              objectIds={showAllProducts ? null : visibleObjectIds}
-              annotations={annotations}
-            />
-          </>
-        )}
+        {/* Product grid */}
+        <ProductGrid
+          projectId={projectId}
+          activeAnnotation={activeAnnotation}
+          showAll={showAll}
+          canAttach={!readOnly && auth.canWrite}
+          onShowAllToggle={() => setShowAll((v) => !v)}
+          onAttachProduct={() => setPickerOpen(true)}
+          onProductClick={(p) => setActiveProduct(p)}
+        />
       </div>
     </>
   );
@@ -428,19 +414,14 @@ function FanEmojiMenu({
   onPick: (objectId: number) => void;
   onClose: () => void;
 }) {
-  // 8 items fanned in a semicircle above the press point
   const radius = 72;
-  const startAngle = 180; // left
-  const endAngle = 360;   // right (upper half)
+  const startAngle = 180;
+  const endAngle = 360;
   const count = OBJECT_IDS.length;
 
   return (
     <>
-      {/* backdrop */}
-      <div
-        style={{ position: "fixed", inset: 0, zIndex: 100 }}
-        onClick={onClose}
-      />
+      <div style={{ position: "fixed", inset: 0, zIndex: 100 }} onClick={onClose} />
       <div style={{ position: "fixed", left: pos.x, top: pos.y, zIndex: 101, transform: "translate(-50%, -50%)" }}>
         {OBJECT_IDS.map((objectId, i) => {
           const angle = startAngle + (i / (count - 1)) * (endAngle - startAngle);
@@ -455,21 +436,16 @@ function FanEmojiMenu({
               title={def.label}
               style={{
                 position: "absolute",
-                left: x,
-                top: y,
+                left: x, top: y,
                 transform: "translate(-50%, -50%)",
-                width: 42,
-                height: 42,
+                width: 42, height: 42,
                 borderRadius: "50%",
                 background: "#fff",
                 border: "2px solid #555",
                 fontSize: 20,
                 cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                display: "flex", alignItems: "center", justifyContent: "center",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                transition: "transform 0.15s",
                 zIndex: 102,
               }}
             >
@@ -477,7 +453,6 @@ function FanEmojiMenu({
             </button>
           );
         })}
-        {/* center dot */}
         <div style={{
           position: "absolute", left: 0, top: 0,
           transform: "translate(-50%, -50%)",
@@ -492,9 +467,7 @@ function FanEmojiMenu({
 // ── Delete confirm popup ──────────────────────────────────────────────────────
 
 function DeleteConfirmPopup({
-  annotation,
-  onCancel,
-  onConfirm,
+  annotation, onCancel, onConfirm,
 }: {
   annotation: Annotation;
   onCancel: () => void;
@@ -521,26 +494,16 @@ function DeleteConfirmPopup({
           {def?.label ?? "Pin"} · {Math.round(annotation.position_x * 100)}%, {Math.round(annotation.position_y * 100)}%
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1, height: 40, borderRadius: 10,
-              border: "0.5px solid #ddd", background: "#f5f5f5",
-              fontSize: 13, cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              flex: 1, height: 40, borderRadius: 10,
-              border: "none", background: "#E24B4A",
-              color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
-            }}
-          >
-            Delete
-          </button>
+          <button onClick={onCancel} style={{
+            flex: 1, height: 40, borderRadius: 10,
+            border: "0.5px solid #ddd", background: "#f5f5f5",
+            fontSize: 13, cursor: "pointer",
+          }}>Cancel</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, height: 40, borderRadius: 10,
+            border: "none", background: "#E24B4A",
+            color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+          }}>Delete</button>
         </div>
       </div>
     </div>
@@ -550,11 +513,7 @@ function DeleteConfirmPopup({
 // ── Pins layer ────────────────────────────────────────────────────────────────
 
 function PinsLayer({
-  annotations,
-  activeId,
-  onSingleTap,
-  onLongPress,
-  onMove,
+  annotations, activeId, onSingleTap, onLongPress,onMove,
 }: {
   annotations: Annotation[];
   activeId: string | null;
@@ -581,9 +540,10 @@ function PinsLayer({
         <div
           key={ann.id}
           className="hm-pin"
-          style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%`, touchAction: "none" }}
+          style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%` }}
           onPointerDown={(e) => {
             e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
             startPos.current[ann.id] = { x: e.clientX, y: e.clientY };
             dragging.current = null;
             timerRefs.current[ann.id] = setTimeout(() => {
@@ -601,10 +561,7 @@ function PinsLayer({
               if (timerRefs.current[ann.id]) {
                 clearTimeout(timerRefs.current[ann.id]);
               }
-              if (dragging.current !== ann.id) {
-                dragging.current = ann.id;
-                e.currentTarget.setPointerCapture(e.pointerId);
-              }
+              dragging.current = ann.id;
               // Move the pin visually
               const container = getContainer();
               if (!container) return;
@@ -660,46 +617,109 @@ function PinsLayer({
 
 function ProductGrid({
   projectId,
-  objectIds,
-  annotations,
+  activeAnnotation,
+  showAll,
+  canAttach,
+  onShowAllToggle,
+  onAttachProduct,
+  onProductClick,
 }: {
   projectId: string;
-  objectIds: number[] | null;
-  annotations: Annotation[];
+  activeAnnotation: Annotation | null;
+  showAll: boolean;
+  canAttach: boolean;
+  onShowAllToggle: () => void;
+  onAttachProduct: () => void;
+  onProductClick: (p: ProductDetail) => void;
 }) {
-  const { data: allProducts = [] } = useProjectProducts(projectId);
-
-  // If filtering, keep only products whose object matches visible annotations
-  // Since object_products doesn't store object_id, we show all project products
-  // when objectIds is null (show all), or all of them when objectIds present
-  // (future: can filter by tagging products with object_id if needed)
-  const products = allProducts;
-
-  if (products.length === 0) {
-    return (
-      <div style={{ padding: "40px 20px", textAlign: "center", color: "#888", fontSize: 13 }}>
-        No products yet — attach one via a pin
-      </div>
-    );
-  }
+  const objectId = (!showAll && activeAnnotation) ? activeAnnotation.object_id : undefined;
+  const def = activeAnnotation ? OBJECT_DEFS[activeAnnotation.object_id] : null;
+  const { data: products = [], isLoading } = useProjectProducts(projectId, objectId);
 
   return (
-    <div className="hm-product-grid">
-      {products.map((p, i) => (
-        <div key={p.id} className="hm-prod-card">
-          <div className="hm-prod-img">
-            {p.thumbnail_url
-              ? <img src={p.thumbnail_url} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <div className="hm-prod-letter">{p.name[0]}</div>
+    <div style={{ background: "#FAFAF8" }}>
+      {/* Header */}
+      <div className="hm-section-header">
+        <div>
+          <div className="hm-section-title">
+            {showAll
+              ? "All Products"
+              : activeAnnotation
+                ? `${def?.emoji ?? ""} ${def?.label ?? "Products"}`
+                : "Products"
             }
           </div>
-          <div className="hm-prod-title">{p.name}</div>
-          {p.brand && <div className="hm-prod-tag">{p.brand}</div>}
-          {p.price != null && (
-            <div className="hm-prod-contact">฿{p.price.toLocaleString("th-TH")}</div>
+          {activeAnnotation && !showAll && (
+            <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+              {Math.round(activeAnnotation.position_x * 100)}%, {Math.round(activeAnnotation.position_y * 100)}%
+            </div>
           )}
         </div>
-      ))}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {canAttach && activeAnnotation && !showAll && (
+            <button
+              onClick={onAttachProduct}
+              style={{
+                fontSize: 11, color: "#fff", background: "#8B6520",
+                border: "none", borderRadius: 8, padding: "5px 10px",
+                cursor: "pointer", fontWeight: 500,
+              }}
+            >
+              + Attach
+            </button>
+          )}
+          <button
+            onClick={onShowAllToggle}
+            style={{
+              fontSize: 11, color: "var(--color-accent, #8B6520)",
+              background: "none", border: "none", cursor: "pointer",
+            }}
+          >
+            {showAll ? "Filter by pin" : "Show all"}
+          </button>
+        </div>
+      </div>
+
+      {/* Grid */}
+      {isLoading && (
+        <div style={{ padding: 32, textAlign: "center" }}>
+          <div className="spinner" />
+        </div>
+      )}
+
+      {!isLoading && products.length === 0 && (
+        <div style={{ padding: "40px 20px", textAlign: "center", color: "#888", fontSize: 13 }}>
+          {activeAnnotation && !showAll
+            ? "No products for this pin yet — tap Attach"
+            : "No products in this project yet"
+          }
+        </div>
+      )}
+
+      {!isLoading && products.length > 0 && (
+        <div className="hm-product-grid">
+          {products.map((p) => (
+            <div
+              key={p.id}
+              className="hm-prod-card"
+              onClick={() => onProductClick(p)}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="hm-prod-img">
+                {p.thumbnail_url
+                  ? <img src={p.thumbnail_url} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <div className="hm-prod-letter">{p.name[0]}</div>
+                }
+              </div>
+              <div className="hm-prod-title">{p.name}</div>
+              {p.brand && <div className="hm-prod-tag">{p.brand}</div>}
+              {p.price != null && (
+                <div className="hm-prod-contact">฿{p.price.toLocaleString("th-TH")}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
