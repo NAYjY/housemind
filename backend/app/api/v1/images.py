@@ -13,6 +13,7 @@ URL contract:
   GET    /api/v1/images/{image_id}/url      → refresh presigned URL (all roles)
   POST   /api/v1/images/upload-url          → get presigned PUT URL (architect + owner)
   POST   /api/v1/images/confirm             → confirm upload, create DB record (architect + owner)
+  POST   /api/v1/images/from-url            → store external URL as image (architect + owner)
   DELETE /api/v1/images/{image_id}          → soft-delete + cascade (architect + owner)
 """
 from __future__ import annotations
@@ -108,10 +109,12 @@ async def refresh_image_url(
 
     return RefreshedImageUrl(image_id=image_id, url=url, expires_in=900)
 
+
 class UrlImageRequest(PydanticBase):
     project_id: uuid.UUID
     url: str
     original_filename: str | None = None
+
 
 @router.post("/from-url", response_model=ProjectImageResponse, status_code=status.HTTP_201_CREATED)
 async def create_image_from_url(
@@ -122,7 +125,7 @@ async def create_image_from_url(
     """Store an external URL as a project image (no S3 upload needed)."""
     image = ProjectImage(
         id=uuid.uuid4(),
-        project_id=project_id,
+        project_id=body.project_id,  # FIX: was undefined `project_id`, must be `body.project_id`
         s3_key=body.url,
         s3_bucket="external",
         original_filename=body.original_filename or body.url[:80],
@@ -143,7 +146,8 @@ async def create_image_from_url(
         created_at=image.created_at,
         url=body.url,
     )
-    
+
+
 # ── POST /images/upload-url ───────────────────────────────────────────────────
 
 @router.post("/upload-url", response_model=UploadPresignResponse)

@@ -15,10 +15,15 @@ interface AnnotationCanvasProps {
   readOnly?: boolean;
 }
 
+// Default object_id used when creating via the simple canvas tap flow.
+// The WorkspaceShell fan-menu picks the real object_id; this canvas
+// component only exists as a lightweight fallback / demo path.
+const DEFAULT_OBJECT_ID = 101;
+
 export function AnnotationCanvas({
   imageId,
   imageUrl,
-  projectId: _projectId, // reserved for future project-scoped operations
+  projectId,
   readOnly = false,
 }: AnnotationCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,24 +34,26 @@ export function AnnotationCanvas({
 
   useAnnotations(imageId); // fetch + hydrate store
 
-  const createMutation = useCreateAnnotation(imageId);
+  // FIX: useCreateAnnotation now requires both imageId AND projectId
+  const createMutation = useCreateAnnotation(imageId, projectId);
   const deleteMutation = useDeleteAnnotation(imageId);
 
   const handleCreateAnnotation = (posX: number, posY: number) => {
     if (readOnly) return;
     // TODO [FLAG-1]: Open product-picker modal here before POSTing.
     // Until product picker is built, annotation is created without a linked product.
-    // linked_product_id is nullable — product can be assigned later.
+    // FIX: payload shape changed — use objectId (int), not linkedProductId (null)
     createMutation.mutate({
       positionX: posX,
       positionY: posY,
-      linkedProductId: null,
+      objectId: DEFAULT_OBJECT_ID,
     });
   };
 
   const handleDeleteAnnotation = (annotationId: string) => {
     if (readOnly) return;
-    deleteMutation.mutate(annotationId);
+    // FIX: mutate now expects { annotationId, projectId }, not a bare string
+    deleteMutation.mutate({ annotationId, projectId });
   };
 
   const { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel } =

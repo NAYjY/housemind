@@ -54,8 +54,6 @@ home_pw=_hash("homeowner123")
 supp_pw=_hash("supplier123")
 
 
-
-
 async def seed(session: AsyncSession) -> None:
     env = os.getenv("ENVIRONMENT", "local")
     if env == "production":
@@ -133,16 +131,17 @@ async def seed(session: AsyncSession) -> None:
     """), {"product_id": PRODUCT_ID, "supplier_id": SUPPLIER_ID})
     print("  ✓ Product seeded")
 
-
     # ── Annotation ────────────────────────────────────────────────────────────
+    # FIX: removed linked_product_id column — it was dropped in migration 005.
+    # object_id=101 links to the emoji category group (was linked_product_id FK).
     await session.execute(text("""
         INSERT INTO annotations (
-            id, image_id, created_by, linked_product_id,
-            position_x, position_y, label, note
+            id, image_id, created_by,
+            object_id, position_x, position_y, label, note
         )
         VALUES (
-            :annotation_id, :image_id, :architect_id, :product_id,
-            0.42, 0.71,
+            :annotation_id, :image_id, :architect_id,
+            101, 0.42, 0.71,
             'พื้น - บริเวณห้องน้ำ',
             'ใช้กระเบื้องโมเสค SCG สำหรับพื้นห้องน้ำทั้งหมด'
         )
@@ -151,14 +150,21 @@ async def seed(session: AsyncSession) -> None:
         "annotation_id": ANNOTATION_ID,
         "image_id": IMAGE_ID,
         "architect_id": ARCHITECT_ID,
-        "product_id": PRODUCT_ID,
     })
     print("  ✓ Annotation seeded")
 
+    # ── Link product to project via object_products ───────────────────────────
+    await session.execute(text("""
+        INSERT INTO object_products (id, project_id, object_id, product_id)
+        VALUES (gen_random_uuid(), :project_id, 101, :product_id)
+        ON CONFLICT ON CONSTRAINT uq_object_products_project_object_product DO NOTHING
+    """), {"project_id": PROJECT_ID, "product_id": PRODUCT_ID})
+    print("  ✓ object_products link seeded")
+
     # ── Invite tokens ─────────────────────────────────────────────────────────
-    for invitee_id, email, role in [
-        (CONTRACTOR_ID, "contractor@housemind.com", "contractor"),
-        (HOMEOWNER_ID,  "homeowner@housemind.com",  "homeowner"),
+    for email, role in [
+        ("contractor@housemind.com", "contractor"),
+        ("homeowner@housemind.com",  "homeowner"),
     ]:
         await session.execute(text("""
             INSERT INTO invite_requests (
@@ -175,7 +181,6 @@ async def seed(session: AsyncSession) -> None:
             "architect_id": ARCHITECT_ID,
             "email": email,
             "role": role,
-            "token": f"seed-token-{role}-do-not-use-in-prod",
         })
     print("  ✓ Invite records seeded")
 

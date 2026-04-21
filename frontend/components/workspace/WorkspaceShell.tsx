@@ -176,7 +176,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     if (!auth.isAuthenticated) { setUploadError("Sign in to upload."); return; }
     setUploading(true); setUploadError("");
     try {
-      const presignRes = await authFetch(`${API}/images/upload-url`, {
+      const presignRes = await authFetch(`${API}/images/upload-url?project_id=${projectId}`, {
         method: "POST",
         body: JSON.stringify({ project_id: projectId, filename: file.name, content_type: file.type }),
       });
@@ -184,7 +184,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
       const { upload_url, s3_key } = await presignRes.json();
       const s3Res = await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       if (!s3Res.ok) throw new Error("S3 upload failed");
-      const confirmRes = await authFetch(`${API}/images/confirm`, {
+      const confirmRes = await authFetch(`${API}/images/confirm?project_id=${projectId}`, {
         method: "POST",
         body: JSON.stringify({ project_id: projectId, s3_key, original_filename: file.name, mime_type: file.type }),
       });
@@ -204,7 +204,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     if (!url) return;
     if (auth.isAuthenticated) {
       try {
-        const res = await authFetch(`${API}/images/from-url`, {
+        const res = await authFetch(`${API}/images/from-url?project_id=${projectId}`, {
           method: "POST",
           body: JSON.stringify({ project_id: projectId, url, original_filename: url.split("/").pop() }),
         });
