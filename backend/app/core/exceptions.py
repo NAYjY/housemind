@@ -62,9 +62,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(405)
-    async def method_not_allowed_handler(req: Request, _exc: Exception) -> JSONResponse:
+    async def method_not_allowed_handler(req: Request, exc: Exception) -> JSONResponse:
         return _error(
-            detail=f"Method {req.method} not allowed",
+            detail=f"Method {req.method} not allowed on {req.url.path}",
             code="METHOD_NOT_ALLOWED",
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
         )

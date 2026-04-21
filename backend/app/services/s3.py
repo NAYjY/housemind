@@ -74,11 +74,14 @@ def presign_project_image(s3_key: str) -> str:
 
 
 def _rewrite_for_browser(url: str) -> str:
+    """Rewrite Docker-internal localstack hostname to localhost for browser access."""
     if _os.getenv("ENVIRONMENT", "local") != "local":
         return url
-    """Rewrite Docker-internal localstack hostname to localhost for browser access."""
-    return url.replace("http://localstack:", "http://localhost:").replace("https://localstack:", "http://localhost:")
-
+    return (
+        url
+        .replace("http://localstack:", "http://localhost:")
+        .replace("https://localstack:", "http://localhost:")
+    )   
 def _presign_get(s3_key: str, expiry: int) -> str:
     client = _get_s3_client_cached()
     try:

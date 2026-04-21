@@ -11,14 +11,14 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, require_architect, require_project_member
 from app.db.session import get_db
 from app.models.object_product import ObjectProduct
 from app.models.product import Product
-from app.schemas.annotation import (
+from app.schemas.product import (
     ObjectProductCreate,
     ObjectProductResponse,
     ProductCreateRequest,
@@ -51,7 +51,7 @@ def _can_create_product(user: dict) -> bool:
     return user["role"] in {"architect", "supplier"}
 
 
-def _sign(p: Product) -> ProductDetail:
+def _presign_product(p: Product) -> ProductDetail:
     try:
         url = presign_product_thumbnail(p.thumbnail_s3_key)
     except RuntimeError:
@@ -101,8 +101,8 @@ async def search_products(
     products = result.scalars().all()
 
     # count
-    from sqlalchemy import func as sqlfunc, select as sel
-    count_stmt = sel(sqlfunc.count()).select_from(Product)
+    from sqlalchemy import func as _func
+    count_stmt = select(_func.count()).select_from(Product)
     if q:
         count_stmt = count_stmt.where(
             or_(
@@ -114,7 +114,7 @@ async def search_products(
     total = (await db.execute(count_stmt)).scalar_one()
 
     return ProductSearchResponse(
-        items=[_sign(p) for p in products],
+        items=[_presign_product(p) for p in products],
         total=total,
     )
 
@@ -136,7 +136,7 @@ async def my_products(
         select(Product).where(Product.supplier_id == uuid.UUID(user["user_id"]))
         .order_by(Product.created_at.desc())
     )
-    return [_sign(p) for p in result.scalars().all()]
+    return [_presign_product(p) for p in result.scalars().all()]
 
 
 # ── POST /products/thumbnail-url ──────────────────────────────────────────────
@@ -191,7 +191,7 @@ async def create_product(
     )
     db.add(product)
     await db.flush()
-    return _sign(product)
+    return _presign_product(product)
 
 
 # ── GET /products/{product_id} ────────────────────────────────────────────────
@@ -206,7 +206,7 @@ async def get_product(
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return _sign(product)
+    return _presign_product(product)
 
 
 # ── GET /products?project_id= ─────────────────────────────────────────────────
@@ -228,7 +228,7 @@ async def list_project_products(
         stmt = stmt.where(ObjectProduct.object_id == object_id)
     stmt = stmt.order_by(ObjectProduct.created_at.desc())
     result = await db.execute(stmt)
-    return [_sign(p) for p in result.scalars().all()]
+    return [_presign_product(p) for p in result.scalars().all()]
 
 
 # POST /products/link — now requires object_id
@@ -266,7 +266,7 @@ async def link_product_to_project(
         object_id=op.object_id,  # add this
         product_id=op.product_id,
         created_at=op.created_at,
-        product=_sign(prod) if prod else None,
+        product=_presign_product(prod) if prod else None,
     )
 
 

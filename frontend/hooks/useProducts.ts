@@ -67,7 +67,7 @@ export function useProductSearch(q: string, projectId?: string) {
       if (!res.ok) throw new Error("Failed to search products");
       return res.json();
     },
-    enabled: q.length >= 0,
+    enabled: q.trim().length > 0,
     staleTime: 30_000,
   });
 }
@@ -154,5 +154,18 @@ export function useUnlinkProduct(projectId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products", "project", projectId] });
     },
+  });
+}
+
+export function useProductDetail(productId: string | null) {
+  return useQuery({
+    queryKey: ["product", productId],
+    queryFn: async () => {
+      const res = await authFetch(`${API}/products/${productId}`);
+      if (!res.ok) throw new Error("Failed to fetch product");
+      return res.json();
+    },
+    enabled: !!productId,
+    staleTime: 3_300_000,
   });
 }

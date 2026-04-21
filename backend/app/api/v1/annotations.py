@@ -25,6 +25,20 @@ from app.schemas.annotation import (
     ResolveAnnotationRequest,
 )
 
+# ── helper
+def _to_summary(ann: Annotation) -> AnnotationSummary:
+    return AnnotationSummary(
+        id=ann.id,
+        image_id=ann.image_id,
+        object_id=ann.object_id,
+        position_x=ann.position_x,
+        position_y=ann.position_y,
+        created_by=ann.created_by,
+        created_at=ann.created_at,
+        resolved_at=ann.resolved_at,
+        resolved_by=ann.resolved_by,
+    )
+
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
 
@@ -37,20 +51,7 @@ async def list_annotations(
     _user: dict = Depends(require_project_member),
 ) -> list[AnnotationSummary]:
     annotations = await list_active_annotations_for_image(db, image_id)
-    return [
-        AnnotationSummary(
-            id=ann.id,
-            image_id=ann.image_id,
-            object_id=ann.object_id,
-            position_x=ann.position_x,
-            position_y=ann.position_y,
-            created_by=ann.created_by,
-            created_at=ann.created_at,
-            resolved_at=ann.resolved_at,
-            resolved_by=ann.resolved_by,
-        )
-        for ann in annotations
-    ]
+    return [_to_summary(ann) for ann in annotations]
 
 
 # ── POST /annotations ─────────────────────────────────────────────────────────
@@ -74,17 +75,7 @@ async def create_annotation(
     db.add(ann)
     await db.flush()
 
-    return AnnotationSummary(
-        id=ann.id,
-        image_id=ann.image_id,
-        object_id=ann.object_id,
-        position_x=ann.position_x,
-        position_y=ann.position_y,
-        created_by=ann.created_by,
-        created_at=ann.created_at,
-        resolved_at=None,
-        resolved_by=None,
-    )
+    return _to_summary(ann)
 
 
 # ── PATCH /annotations/{annotation_id}/move ──────────────────────────────────
@@ -107,17 +98,7 @@ async def move_annotation(
 
     await db.flush()
 
-    return AnnotationSummary(
-        id=ann.id,
-        image_id=ann.image_id,
-        object_id=ann.object_id,
-        position_x=ann.position_x,
-        position_y=ann.position_y,
-        created_by=ann.created_by,
-        created_at=ann.created_at,
-        resolved_at=ann.resolved_at,
-        resolved_by=ann.resolved_by,
-    )
+    return _to_summary(ann)
 
 
 # ── DELETE /annotations/{annotation_id} ──────────────────────────────────────

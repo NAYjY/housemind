@@ -1,5 +1,6 @@
 // hooks/useAnnotations.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { authFetch } from "@/lib/auth";
 import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 
@@ -8,17 +9,24 @@ const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 export function useAnnotations(imageId: string) {
   const setAnnotations = useAnnotationStore((s) => s.setAnnotations);
   const isRealId = !!imageId && !imageId.startsWith("local-");
-  return useQuery({
+
+  const query = useQuery({
     queryKey: ["annotations", imageId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Annotation[]> => {
       const res = await authFetch(`${API}/annotations?image_id=${imageId}`);
       if (!res.ok) throw new Error("Failed to fetch annotations");
-      const data: Annotation[] = await res.json();
-      setAnnotations(imageId, data);
-      return data;
+      return res.json();
     },
     enabled: isRealId,
   });
+
+  useEffect(() => {
+    if (query.data) {
+      setAnnotations(imageId, query.data);
+    }
+  }, [query.data, imageId, setAnnotations]);
+
+  return query;
 }
 
 export function useCreateAnnotation(imageId: string, projectId: string) {
@@ -99,15 +107,3 @@ export function useReopenAnnotation(imageId: string) {
   });
 }
 
-export function useProductDetail(productId: string | null) {
-  return useQuery({
-    queryKey: ["product", productId],
-    queryFn: async () => {
-      const res = await authFetch(`${API}/products/${productId}`);
-      if (!res.ok) throw new Error("Failed to fetch product");
-      return res.json();
-    },
-    enabled: !!productId,
-    staleTime: 3_300_000,
-  });
-}

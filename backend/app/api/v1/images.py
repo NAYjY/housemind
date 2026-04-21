@@ -26,10 +26,10 @@ from pydantic import BaseModel as PydanticBase
 
 from app.auth import require_project_member, require_project_owner
 from app.config import settings
-from app.db.queries import get_active_image, list_active_images, soft_delete_image
+from app.db.queries import get_active_image, list_active_images_for_project, soft_delete_image
 from app.db.session import get_db
 from app.models.project_image import ProjectImage
-from app.schemas.annotation import (
+from app.schemas.image import (
     ProjectImageResponse,
     RefreshedImageUrl,
     UploadConfirmRequest,
@@ -59,7 +59,7 @@ async def list_project_images(
     Each image includes a fresh pre-signed GET URL (900 s expiry).
     Frontend should set React Query staleTime ≤ 600 000 ms (10 min).
     """
-    images = await list_active_images(db, project_id)
+    images = await list_active_images_for_project(db, project_id)
 
     result = []
     for image in images:
@@ -122,11 +122,11 @@ async def create_image_from_url(
     """Store an external URL as a project image (no S3 upload needed)."""
     image = ProjectImage(
         id=uuid.uuid4(),
-        project_id=body.project_id,
-        s3_key=body.url,          # store URL in s3_key field
-        s3_bucket="external",     # sentinel value
+        project_id=project_id,
+        s3_key=body.url,
+        s3_bucket="external",
         original_filename=body.original_filename or body.url[:80],
-        mime_type="image/jpeg",   # assumed for external URLs
+        mime_type="image/jpeg",
     )
     db.add(image)
     await db.flush()
@@ -141,7 +141,7 @@ async def create_image_from_url(
         height_px=None,
         display_order=image.display_order,
         created_at=image.created_at,
-        url=body.url,             # return URL directly
+        url=body.url,
     )
     
 # ── POST /images/upload-url ───────────────────────────────────────────────────

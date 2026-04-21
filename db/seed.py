@@ -133,6 +133,7 @@ async def seed(session: AsyncSession) -> None:
     """), {"product_id": PRODUCT_ID, "supplier_id": SUPPLIER_ID})
     print("  ✓ Product seeded")
 
+
     # ── Annotation ────────────────────────────────────────────────────────────
     await session.execute(text("""
         INSERT INTO annotations (

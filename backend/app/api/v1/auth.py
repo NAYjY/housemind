@@ -145,7 +145,7 @@ async def create_invite(
     await db.flush()
 
     return InviteCreateResponse(
-        user_id=user.id,
+        invite_id=user.id,
         invitee_email=user.email,
         invitee_role=user.role,
         status="created",

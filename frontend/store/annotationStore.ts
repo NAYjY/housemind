@@ -2,6 +2,8 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
+import type { ProductDetail } from "@/hooks/useProducts";
+
 export interface Annotation {
   id: string;
   image_id: string;
@@ -14,18 +16,7 @@ export interface Annotation {
   resolved_by: string | null;
 }
 
-export interface ProductDetail {
-  id: string;
-  name: string;
-  brand: string | null;
-  model: string | null;
-  price: number | null;
-  currency: string;
-  description: string | null;
-  thumbnail_url: string;
-  supplier_id: string | null;
-  specs: Record<string, unknown> | null;
-}
+
 
 interface AnnotationState {
   annotationsByImage: Record<string, Annotation[]>;

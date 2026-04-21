@@ -43,7 +43,7 @@ async def get_active_image(
     return result.scalar_one_or_none()
 
 
-async def list_active_images(
+async def list_active_images_for_project(
     session: AsyncSession, project_id: uuid.UUID
 ) -> Sequence[ProjectImage]:
     """All non-deleted images for a project, ordered for display."""
