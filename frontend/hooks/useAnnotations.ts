@@ -59,6 +59,23 @@ export function useCreateAnnotation(imageId: string, projectId: string) {
   });
 }
 
+export function useMoveAnnotation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, normX, normY }: { id: string; normX: number; normY: number }) => {
+      const res = await authFetch(`${API}/annotations/${id}/move?project_id=${projectId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ position_x: normX, position_y: normY }),
+      });
+      if (!res.ok) throw new Error("Failed to move annotation");
+      return res.json();
+    },
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["annotations"] });
+    },
+  });
+}
+
 export function useDeleteAnnotation(imageId: string) {
   const qc = useQueryClient();
   const deleteAnnotation = useAnnotationStore((s) => s.deleteAnnotation);
