@@ -1,5 +1,20 @@
 """
 app/api/v1/annotations.py — HouseMind
+
+Security fix (IDOR — cross-project resource access):
+  Previously, create / move / delete accepted project_id as a query param
+  used only by require_project_owner to confirm the caller owns *some* project.
+  The subsequent DB fetch used only annotation_id with no project scope, so an
+  architect could mutate annotations that belong to a different architect's project
+  by supplying their own project_id alongside an alien annotation_id.
+
+  Fix: expose project_id explicitly in each mutation endpoint and pass it into
+  the project-scoped query helpers (get_active_annotation_in_project /
+  soft_delete_annotation_in_project) which JOIN through project_images to verify
+  the annotation actually lives in the authorised project.
+
+  Resolve / reopen are not affected: they use require_architect_or_contractor
+  (no client-supplied project_id) and do not perform cross-project mutations.
 """
 from __future__ import annotations
 
@@ -12,8 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import require_architect_or_contractor, require_project_member, require_project_owner
 from app.db.queries import (
     get_active_annotation,
+    get_active_annotation_in_project,
+    get_active_image_in_project,
     list_active_annotations_for_image,
-    soft_delete_annotation,
+    soft_delete_annotation_in_project,
 )
 from app.db.session import get_db
 from app.models.annotation import Annotation
@@ -59,9 +76,23 @@ async def list_annotations(
 @router.post("", response_model=AnnotationSummary, status_code=status.HTTP_201_CREATED)
 async def create_annotation(
     body: CreateAnnotationRequest,
+    # project_id is shared with require_project_owner (FastAPI resolves once).
+    # We declare it explicitly so we can use it to scope the image membership check.
+    project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ) -> AnnotationSummary:
+    # Security: verify body.image_id actually belongs to the project the caller
+    # is authorised for.  Without this check an architect could POST annotations
+    # onto images from another architect's project by supplying their own
+    # project_id as the query param alongside a foreign image_id in the body.
+    image = await get_active_image_in_project(db, body.image_id, project_id)
+    if image is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found in this project",
+        )
+
     ann = Annotation(
         id=uuid.uuid4(),
         image_id=body.image_id,
@@ -84,10 +115,13 @@ async def create_annotation(
 async def move_annotation(
     annotation_id: uuid.UUID,
     body: AnnotationUpdateRequest,
+    # Shared with require_project_owner.
+    project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ) -> AnnotationSummary:
-    ann = await get_active_annotation(db, annotation_id)
+    # Security: use project-scoped fetch to prevent cross-project IDOR.
+    ann = await get_active_annotation_in_project(db, annotation_id, project_id)
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
 
@@ -106,10 +140,13 @@ async def move_annotation(
 @router.delete("/{annotation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_annotation(
     annotation_id: uuid.UUID,
+    # Shared with require_project_owner.
+    project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_project_owner),
 ):
-    ann = await soft_delete_annotation(db, annotation_id)
+    # Security: project-scoped soft-delete rejects annotation_ids from other projects.
+    ann = await soft_delete_annotation_in_project(db, annotation_id, project_id)
     if ann is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -119,6 +156,12 @@ async def delete_annotation(
 
 
 # ── PATCH /annotations/{annotation_id}/resolve ───────────────────────────────
+#
+# resolve and reopen use require_architect_or_contractor which does NOT inject
+# a client-supplied project_id — the role check is sufficient here because the
+# contractor/architect pair already shares the workspace.  If project-level
+# scoping is required in future, add project_id as a query param and use
+# get_active_annotation_in_project.
 
 @router.patch("/{annotation_id}/resolve", response_model=AnnotationDetail)
 async def resolve_annotation(
