@@ -74,32 +74,24 @@ export function AnnotationPin({ annotation, isActive, index }: AnnotationPinProp
               height: "80%",
             }}
           >
-            {annotation.thumbnail_url ? (
-              <Image
-                src={annotation.thumbnail_url}
-                alt="Product thumbnail"
-                width={40}
-                height={40}
-                style={{ objectFit: "cover", width: "100%", height: "100%" }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  background: isActive ? T.accentMid : T.accentLight,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: isActive ? "#fff" : T.accentDark,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  fontFamily: "'DM Serif Display', serif",
-                }}
-              >
-                {index + 1}
-              </div>
-            )}
+            
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                background: isActive ? T.accentMid : T.accentLight,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: isActive ? "#fff" : T.accentDark,
+                fontSize: 13,
+                fontWeight: 500,
+                fontFamily: "'DM Serif Display', serif",
+              }}
+            >
+              {index + 1}
+            </div>
+            
           </div>
         </div>
 

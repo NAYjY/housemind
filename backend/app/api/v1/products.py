@@ -55,6 +55,7 @@ def _presign_product(p: Product) -> ProductDetail:
     try:
         url = presign_product_thumbnail(p.thumbnail_s3_key)
     except RuntimeError:
+        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key)
         url = ""
     return ProductDetail(
         id=p.id,
@@ -194,21 +195,6 @@ async def create_product(
     return _presign_product(product)
 
 
-# ── GET /products/{product_id} ────────────────────────────────────────────────
-
-@router.get("/{product_id}", response_model=ProductDetail)
-async def get_product(
-    product_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_project_member),
-) -> ProductDetail:
-    result = await db.execute(select(Product).where(Product.id == product_id))
-    product = result.scalar_one_or_none()
-    if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return _presign_product(product)
-
-
 # ── GET /products?project_id= ─────────────────────────────────────────────────
 
 # GET /products?project_id=&object_id= (add optional object_id filter)
@@ -331,3 +317,17 @@ async def scrape_product_images(
     if not imgs:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No images found")
     return ScrapeImagesResponse(images=imgs[:_MAX_SCRAPE_IMAGES], source_url=url)
+
+# ── GET /products/{product_id} ────────────────────────────────────────────────
+
+@router.get("/{product_id}", response_model=ProductDetail)
+async def get_product(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(require_project_member),
+) -> ProductDetail:
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return _presign_product(product)

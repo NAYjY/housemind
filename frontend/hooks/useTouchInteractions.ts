@@ -24,7 +24,6 @@ export function useTouchInteractions({
   pinHitRadiusPx = 28,
 }: UseTouchInteractionsProps) {
   const setActivePin = useAnnotationStore((s) => s.setActivePin);
-  const setPendingPosition = useAnnotationStore((s) => s.setPendingPosition);
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -133,13 +132,12 @@ export function useTouchInteractions({
         // Tap on empty canvas → create new annotation
         const norm = getNormalized(touch);
         if (!norm) return;
-        setPendingPosition({ x: norm.normX, y: norm.normY });
         onCreateAnnotation(norm.normX, norm.normY);
       }
 
       touchStartPos.current = null;
     },
-    [findHitPin, getNormalized, onCreateAnnotation, setActivePin, setPendingPosition]
+    [findHitPin, getNormalized, onCreateAnnotation, setActivePin]
   );
 
   const onTouchCancel = useCallback(() => {

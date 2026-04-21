@@ -11,7 +11,7 @@ Changes:
 Run: alembic upgrade head
 """
 from __future__ import annotations
-
+from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
