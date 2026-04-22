@@ -57,9 +57,10 @@ export default function LoginPage() {
       // Set locale (Thai default for Thai audience)
       setLocale("th");
 
-      router.push(
-        "/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001"
-      );
+      // router.push(
+      //   "/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001"
+      // );
+      router.push("/th/profile");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
