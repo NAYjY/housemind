@@ -2,30 +2,55 @@
 app/services/s3.py — HouseMind
 Pre-signed URL generation for S3 assets.
 
-Alignment fixes vs Backend agent draft:
-  - AWS_REGION → AWS_DEFAULT_REGION       (DevOps canonical; standard AWS SDK name)
-  - S3_BUCKET_PRODUCTS/PROJECTS → S3_BUCKET_NAME  (single bucket, prefix strategy)
-    Key prefixes: products/thumbnails/<id>  |  projects/<pid>/images/<id>
-
-Pre-sign expiry policy (per Backend agent spec):
-  - Product thumbnails : 3600 s  (1 hour)
-  - Project images     :  900 s  (15 minutes)
+SEC-11 fix: _sanitize_extension() added.
+  Previously `ext = PurePosixPath(body.filename).suffix.lstrip(".").lower()`
+  was used to build S3 keys.  A filename like "image.jpg/../../../other.php"
+  or "image.php%00.jpg" could produce a key outside the expected prefix,
+  potentially overwriting keys in another project's namespace.
+  _sanitize_extension() restricts to a strict allowlist of image extensions.
 """
 from __future__ import annotations
+
+import os as _os
+import re
 
 import boto3
 from botocore.exceptions import ClientError
 
 from app.config import settings
 
-# Key prefix constants — single source of truth
 PREFIX_PRODUCT_THUMBNAILS = "products/thumbnails/"
 PREFIX_PROJECT_IMAGES = "projects/"
 
+# SEC-11: allowlist of permitted image extensions.  Anything else falls back
+# to "jpg".  The regex intentionally excludes ".php", ".svg" (XSS vector
+# when served without Content-Type), ".html", and path separators.
+_ALLOWED_EXTENSIONS = frozenset({
+    "jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "heif",
+})
+_SAFE_EXT_RE = re.compile(r"^[a-z0-9]{1,10}$")
 
-# Module-level singleton — boto3 clients are thread-safe and meant to be reused.
-# endpoint_url supports LocalStack in local dev (AWS_ENDPOINT_URL env var).
-import os as _os
+
+def _sanitize_extension(raw_ext: str) -> str:
+    """
+    Accept only known-safe image extensions.
+
+    Args:
+        raw_ext: Raw extension string, WITH or WITHOUT leading dot.
+
+    Returns:
+        Lowercase alphanumeric extension string without dot, e.g. "jpg".
+        Falls back to "jpg" for anything unknown or unsafe.
+    """
+    ext = raw_ext.lstrip(".").lower()
+    # Strip anything after a null byte, space, or path separator
+    ext = re.split(r"[\x00\s/\\?#]", ext)[0]
+    if not _SAFE_EXT_RE.match(ext):
+        return "jpg"
+    if ext not in _ALLOWED_EXTENSIONS:
+        return "jpg"
+    return ext
+
 
 def _get_s3_client():
     kwargs: dict = dict(
@@ -38,8 +63,9 @@ def _get_s3_client():
         kwargs["endpoint_url"] = endpoint_url
     return boto3.client("s3", **kwargs)
 
-# Lazy singleton — created once per process on first use
+
 _s3_client = None
+
 
 def _get_s3_client_cached():
     global _s3_client
@@ -51,37 +77,27 @@ def _get_s3_client_cached():
 # ── Pre-signed GET URLs ───────────────────────────────────────────────────────
 
 def presign_product_thumbnail(s3_key: str) -> str:
-    """
-    Return a pre-signed GET URL for a product thumbnail.
-    Valid for 1 hour (3 600 s). Frontend staleTime should be ≤ 3 300 000 ms (55 min).
-    """
-    # External URLs are stored directly in s3_key
     if s3_key.startswith("http://") or s3_key.startswith("https://"):
         return s3_key
     return _presign_get(s3_key, expiry=3600)
 
 
 def presign_project_image(s3_key: str) -> str:
-    """
-    Return a pre-signed GET URL for a project image.
-    Valid for 15 minutes (900 s). Frontend staleTime should be ≤ 600 000 ms (10 min).
-    """
-    # External URLs are stored directly in s3_key
     if s3_key.startswith("http://") or s3_key.startswith("https://"):
         return s3_key
-
     return _presign_get(s3_key, expiry=900)
 
 
 def _rewrite_for_browser(url: str) -> str:
-    """Rewrite Docker-internal localstack hostname to localhost for browser access."""
     if _os.getenv("ENVIRONMENT", "local") != "local":
         return url
     return (
         url
         .replace("http://localstack:", "http://localhost:")
         .replace("https://localstack:", "http://localhost:")
-    )   
+    )
+
+
 def _presign_get(s3_key: str, expiry: int) -> str:
     client = _get_s3_client_cached()
     try:
@@ -95,8 +111,9 @@ def _presign_get(s3_key: str, expiry: int) -> str:
         raise RuntimeError(f"S3 presign (GET) failed for key={s3_key!r}: {exc}") from exc
 
 
+# ── Pre-signed PUT URLs (upload) ──────────────────────────────────────────────
+
 def presign_product_thumbnail_upload(s3_key: str, content_type: str) -> str:
-    """Presigned PUT URL for product thumbnail upload. Valid 15 min."""
     client = _get_s3_client_cached()
     try:
         url = client.generate_presigned_url(
@@ -111,18 +128,9 @@ def presign_product_thumbnail_upload(s3_key: str, content_type: str) -> str:
         return _rewrite_for_browser(url)
     except ClientError as exc:
         raise RuntimeError(f"S3 presign (PUT) failed for key={s3_key!r}: {exc}") from exc
-# ── Pre-signed PUT URLs (upload) ─────────────────────────────────────────────
+
 
 def presign_project_image_upload(s3_key: str, content_type: str) -> str:
-    """
-    Return a pre-signed PUT URL for direct client-to-S3 upload.
-    Valid for 15 minutes. Client must supply Content-Type header matching content_type.
-
-    IMPORTANT: The ProjectImage DB record must NOT be created until the client
-    confirms a successful upload (POST /api/v1/images/confirm). This function
-    only returns the URL — record creation is the caller's responsibility AFTER
-    receiving the confirm request.
-    """
     client = _get_s3_client_cached()
     try:
         url = client.generate_presigned_url(
@@ -140,10 +148,16 @@ def presign_project_image_upload(s3_key: str, content_type: str) -> str:
 
 
 def make_project_image_key(project_id: str, image_id: str, extension: str) -> str:
-    """Canonical S3 key for a project image."""
-    return f"{PREFIX_PROJECT_IMAGES}{project_id}/images/{image_id}.{extension}"
+    """
+    SEC-11: extension sanitized before embedding in key.
+    """
+    safe_ext = _sanitize_extension(extension)
+    return f"{PREFIX_PROJECT_IMAGES}{project_id}/images/{image_id}.{safe_ext}"
 
 
 def make_product_thumbnail_key(product_id: str, extension: str) -> str:
-    """Canonical S3 key for a product thumbnail."""
-    return f"{PREFIX_PRODUCT_THUMBNAILS}{product_id}.{extension}"
+    """
+    SEC-11: extension sanitized before embedding in key.
+    """
+    safe_ext = _sanitize_extension(extension)
+    return f"{PREFIX_PRODUCT_THUMBNAILS}{product_id}.{safe_ext}"

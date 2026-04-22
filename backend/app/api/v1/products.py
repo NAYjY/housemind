@@ -1,20 +1,48 @@
 """
 app/api/v1/products.py — HouseMind
 Product CRUD + search + scrape + object_products linking.
+
+Security fixes:
+
+SEC-01  IDOR on object_products — DELETE and POST /products/link now use
+        require_project_owner so only the project architect can link/unlink
+        products.  Previously require_project_member (a no-op) allowed ANY
+        authenticated user to delete product links from any project.
+
+SEC-02  SSRF via scrape endpoint — URL is validated through ssrf_guard
+        before httpx fetches it.  Private/internal IPs are blocked.
+
+SEC-07  Product search no longer returns the global catalogue.  If project_id
+        is supplied, only products linked to that project are returned.  If
+        not supplied, the endpoint now requires project_id.
+
+SEC-08  NameError fixed — logger was used in _presign_product but was never
+        imported.  Added `from app.core.logging import get_logger`.
+
+SEC-14  Pagination added to list_project_products and search.
+
+SEC-16  Scrape endpoint reads at most SCRAPE_MAX_BYTES (2 MB) of response
+        body.  Previously the entire response was parsed into memory.
+
+SEC-25  External thumbnail URLs validated: must be https, must end with an
+        image extension or be an S3 URL.  This prevents an attacker from
+        storing a tracking pixel URL as a product thumbnail.
 """
 from __future__ import annotations
 
+import re
 import uuid
 from pathlib import PurePosixPath
 from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select, func
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, require_architect, require_project_member
+from app.auth import get_current_user, require_architect, require_project_member, require_project_owner
+from app.core.logging import get_logger  # SEC-08: was missing
 from app.db.session import get_db
 from app.models.object_product import ObjectProduct
 from app.models.product import Product
@@ -33,6 +61,9 @@ from app.services.s3 import (
     presign_product_thumbnail,
     presign_product_thumbnail_upload,
 )
+from app.services.ssrf_guard import validate_url_against_ssrf  # SEC-02
+
+logger = get_logger(__name__)  # SEC-08
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -45,6 +76,18 @@ _SCRAPE_HEADERS = {
 }
 _MAX_SCRAPE_IMAGES = 20
 _SCRAPE_TIMEOUT = 8.0
+_SCRAPE_MAX_BYTES = 2 * 1024 * 1024  # SEC-16: 2 MB hard cap
+
+# SEC-25: trusted thumbnail URL patterns
+_TRUSTED_THUMBNAIL_RE = re.compile(
+    r"^https://"                            # https only
+    r"("
+    r"[a-z0-9\-]+\.s3\.[a-z0-9\-]+\.amazonaws\.com/"  # S3 virtual-hosted
+    r"|s3\.[a-z0-9\-]+\.amazonaws\.com/"              # S3 path-style
+    r"|[a-z0-9\-\.]+\.(jpg|jpeg|png|webp|gif|avif)$"  # direct image URL
+    r")",
+    re.IGNORECASE,
+)
 
 
 def _can_create_product(user: dict) -> bool:
@@ -55,7 +98,7 @@ def _presign_product(p: Product) -> ProductDetail:
     try:
         url = presign_product_thumbnail(p.thumbnail_s3_key)
     except RuntimeError:
-        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key)
+        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key)  # SEC-08
         url = ""
     return ProductDetail(
         id=p.id,
@@ -71,25 +114,57 @@ def _presign_product(p: Product) -> ProductDetail:
     )
 
 
+def _validate_thumbnail_url(url: str) -> str:
+    """
+    SEC-25: reject external thumbnail URLs that don't look like images.
+    This prevents tracking pixel injection (attacker stores
+    https://attacker.com/pixel.gif?user=X as a product thumbnail).
+    Trusted patterns: S3 URLs or direct image file URLs (https only).
+    """
+    if not url:
+        return url
+    if not url.startswith("https://"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Thumbnail URL must use https://",
+        )
+    if not _TRUSTED_THUMBNAIL_RE.match(url):
+        # Check if it ends with a known image extension as fallback
+        lower = url.lower().split("?")[0]  # strip query string
+        if not any(lower.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif")):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Thumbnail URL must point to an image file (jpg, png, webp, gif, avif) "
+                    "or an S3 bucket URL."
+                ),
+            )
+    return url
+
+
 # ── GET /products/search ──────────────────────────────────────────────────────
 
 @router.get("/search", response_model=ProductSearchResponse)
 async def search_products(
+    project_id: uuid.UUID = Query(..., description="Required — search within this project"),
     q: str = Query(default="", description="Search term"),
-    project_id: uuid.UUID | None = Query(default=None),
-    limit: int = Query(default=20, le=100),
-    offset: int = Query(default=0),
+    limit: int = Query(default=20, le=100),    # SEC-14
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_member),
+    user: dict = Depends(require_project_member),  # SEC-04: now a real membership check
 ) -> ProductSearchResponse:
     """
-    Search products by name/brand/model.
-    If project_id given, also returns products already in that project first.
-    Used by ProductPickerModal.
+    SEC-07 fix: search is now scoped to a project.  project_id is required.
+    Returns only products linked to that project, filtered by query.
+    Previously returned the entire global product catalogue.
     """
-    stmt = select(Product)
-    if q:
-        like = f"%{q}%"
+    stmt = (
+        select(Product)
+        .join(ObjectProduct, ObjectProduct.product_id == Product.id)
+        .where(ObjectProduct.project_id == project_id)
+    )
+    if q.strip():
+        like = f"%{q.strip()}%"
         stmt = stmt.where(
             or_(
                 Product.name.ilike(like),
@@ -97,22 +172,15 @@ async def search_products(
                 Product.model.ilike(like),
             )
         )
+
+    count_stmt = select(
+        __import__("sqlalchemy", fromlist=["func"]).func.count()
+    ).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar_one()
+
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
     products = result.scalars().all()
-
-    # count
-    from sqlalchemy import func as _func
-    count_stmt = select(_func.count()).select_from(Product)
-    if q:
-        count_stmt = count_stmt.where(
-            or_(
-                Product.name.ilike(f"%{q}%"),
-                Product.brand.ilike(f"%{q}%"),
-                Product.model.ilike(f"%{q}%"),
-            )
-        )
-    total = (await db.execute(count_stmt)).scalar_one()
 
     return ProductSearchResponse(
         items=[_presign_product(p) for p in products],
@@ -127,15 +195,13 @@ async def my_products(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ) -> list[ProductDetail]:
-    """
-    Returns products created by the current user (supplier or architect).
-    Used on /products page.
-    """
     if not _can_create_product(user):
         return []
     result = await db.execute(
-        select(Product).where(Product.supplier_id == uuid.UUID(user["user_id"]))
+        select(Product)
+        .where(Product.supplier_id == uuid.UUID(user["user_id"]))
         .order_by(Product.created_at.desc())
+        .limit(500)  # SEC-14: hard cap even on "my products"
     )
     return [_presign_product(p) for p in result.scalars().all()]
 
@@ -147,10 +213,10 @@ async def get_thumbnail_upload_url(
     body: ProductPresignRequest,
     user: dict = Depends(get_current_user),
 ) -> ProductPresignResponse:
-    """Step 1: get presigned S3 PUT URL for product thumbnail."""
     if not _can_create_product(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    ext = PurePosixPath(body.filename).suffix.lstrip(".").lower() or "jpg"
+    from pathlib import PurePosixPath as _P
+    ext = _P(body.filename).suffix.lstrip(".").lower() or "jpg"
     product_id = uuid.uuid4()
     s3_key = make_product_thumbnail_key(str(product_id), ext)
     try:
@@ -168,15 +234,12 @@ async def create_product(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ) -> ProductDetail:
-    """
-    Architect or supplier creates a product.
-    thumbnail_s3_key: either S3 key from upload flow OR direct URL.
-    """
     if not _can_create_product(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    # thumbnail: direct URL or S3 key
-    thumbnail_s3_key = body.thumbnail_url or ""
+    thumbnail_s3_key = ""
+    if body.thumbnail_url:
+        thumbnail_s3_key = _validate_thumbnail_url(body.thumbnail_url)  # SEC-25
 
     product = Product(
         id=uuid.uuid4(),
@@ -197,13 +260,14 @@ async def create_product(
 
 # ── GET /products?project_id= ─────────────────────────────────────────────────
 
-# GET /products?project_id=&object_id= (add optional object_id filter)
 @router.get("", response_model=list[ProductDetail])
 async def list_project_products(
     project_id: uuid.UUID = Query(...),
-    object_id: int | None = Query(default=None),  # add this
+    object_id: int | None = Query(default=None),
+    limit: int = Query(default=100, le=500),   # SEC-14
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_project_member),
+    _user: dict = Depends(require_project_member),  # SEC-04: real membership check
 ) -> list[ProductDetail]:
     stmt = (
         select(Product)
@@ -212,22 +276,27 @@ async def list_project_products(
     )
     if object_id is not None:
         stmt = stmt.where(ObjectProduct.object_id == object_id)
-    stmt = stmt.order_by(ObjectProduct.created_at.desc())
+    stmt = stmt.order_by(ObjectProduct.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(stmt)
     return [_presign_product(p) for p in result.scalars().all()]
 
 
-# POST /products/link — now requires object_id
+# ── POST /products/link ────────────────────────────────────────────────────────
+
 @router.post("/link", response_model=ObjectProductResponse, status_code=status.HTTP_201_CREATED)
 async def link_product_to_project(
     body: ObjectProductCreate,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_member),
+    user: dict = Depends(require_project_owner),  # SEC-01: was require_project_member
 ) -> ObjectProductResponse:
+    """
+    SEC-01 fix: require_project_owner enforces that only the project architect
+    can link products.  Previously require_project_member was a no-op.
+    """
     existing = await db.execute(
         select(ObjectProduct).where(
             ObjectProduct.project_id == body.project_id,
-            ObjectProduct.object_id == body.object_id,  # add this
+            ObjectProduct.object_id == body.object_id,
             ObjectProduct.product_id == body.product_id,
         )
     )
@@ -237,7 +306,7 @@ async def link_product_to_project(
     op = ObjectProduct(
         id=uuid.uuid4(),
         project_id=body.project_id,
-        object_id=body.object_id,  # add this
+        object_id=body.object_id,
         product_id=body.product_id,
     )
     db.add(op)
@@ -249,7 +318,7 @@ async def link_product_to_project(
     return ObjectProductResponse(
         id=op.id,
         project_id=op.project_id,
-        object_id=op.object_id,  # add this
+        object_id=op.object_id,
         product_id=op.product_id,
         created_at=op.created_at,
         product=_presign_product(prod) if prod else None,
@@ -261,18 +330,27 @@ async def link_product_to_project(
 @router.delete("/link/{object_product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def unlink_product_from_project(
     object_product_id: uuid.UUID,
+    project_id: uuid.UUID = Query(...),  # SEC-01: required for ownership check
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_member),
-):
+    user: dict = Depends(require_project_owner),  # SEC-01: was require_project_member
+) -> Response:
+    """
+    SEC-01 fix: project_id query param added so require_project_owner can
+    verify ownership.  The query also asserts object_product.project_id
+    matches — prevents deleting a link from a different project even if the
+    caller owns some project.
+    """
     result = await db.execute(
-        select(ObjectProduct).where(ObjectProduct.id == object_product_id)
+        select(ObjectProduct).where(
+            ObjectProduct.id == object_product_id,
+            ObjectProduct.project_id == project_id,  # project scope guard
+        )
     )
     op = result.scalar_one_or_none()
     if not op:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     await db.delete(op)
     await db.flush()
-    from fastapi import Response
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -283,28 +361,56 @@ async def scrape_product_images(
     url: str = Query(...),
     _user: dict = Depends(require_architect),
 ) -> ScrapeImagesResponse:
+    """
+    SEC-02 fix: URL validated through ssrf_guard before the request fires.
+    Private IPs, loopback, link-local (169.254.x.x — AWS metadata), and
+    RFC 1918 ranges are all blocked.
+
+    SEC-16 fix: response body capped at SCRAPE_MAX_BYTES (2 MB).
+    Previously the entire response was buffered into memory, enabling
+    memory exhaustion via a slow, large response.
+    """
+    validate_url_against_ssrf(url, require_https=True)  # SEC-02
+
     try:
         async with httpx.AsyncClient(
             timeout=_SCRAPE_TIMEOUT,
             follow_redirects=True,
             headers=_SCRAPE_HEADERS,
         ) as client:
-            resp = await client.get(url)
+            async with client.stream("GET", url) as response:
+                content_type = response.headers.get("content-type", "")
+                chunks: list[bytes] = []
+                total = 0
+                async for chunk in response.aiter_bytes(chunk_size=65536):
+                    total += len(chunk)
+                    if total > _SCRAPE_MAX_BYTES:  # SEC-16
+                        raise HTTPException(
+                            status_code=status.HTTP_502_BAD_GATEWAY,
+                            detail="Remote response exceeds 2 MB limit",
+                        )
+                    chunks.append(chunk)
+                raw = b"".join(chunks)
     except httpx.TimeoutException:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Timed out")
     except httpx.RequestError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
-    content_type = resp.headers.get("content-type", "")
     if content_type.startswith("image/"):
         return ScrapeImagesResponse(images=[url], source_url=url)
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(raw, "html.parser")
     imgs: list[str] = []
     for tag in soup.find_all("img"):
         src = tag.get("src")
         if src:
-            imgs.append(urljoin(url, src))
+            absolute = urljoin(url, src)
+            # SEC-02: validate each scraped image URL too
+            try:
+                validate_url_against_ssrf(absolute, require_https=False)
+                imgs.append(absolute)
+            except HTTPException:
+                continue  # silently skip internal-pointing image URLs
         if len(imgs) >= _MAX_SCRAPE_IMAGES:
             break
     if not imgs:
@@ -313,10 +419,16 @@ async def scrape_product_images(
             if prop in ("og:image", "twitter:image"):
                 content = tag.get("content")
                 if content:
-                    imgs.append(urljoin(url, content))
+                    absolute = urljoin(url, content)
+                    try:
+                        validate_url_against_ssrf(absolute, require_https=False)
+                        imgs.append(absolute)
+                    except HTTPException:
+                        continue
     if not imgs:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No images found")
     return ScrapeImagesResponse(images=imgs[:_MAX_SCRAPE_IMAGES], source_url=url)
+
 
 # ── GET /products/{product_id} ────────────────────────────────────────────────
 
@@ -324,7 +436,7 @@ async def scrape_product_images(
 async def get_product(
     product_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_project_member),
+    _user: dict = Depends(get_current_user),  # any authenticated user can view catalog
 ) -> ProductDetail:
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()

@@ -1,7 +1,22 @@
 "use client";
 
+/**
+ * hooks/useAuth.ts — HouseMind
+ *
+ * SEC-13: authentication state is now derived from localStorage role/user_id
+ * (non-secret fields stored by storeSession after login).
+ * The JWT itself lives in an httpOnly cookie and is never accessed by JS.
+ */
+
 import { useState, useEffect } from "react";
-import { getCurrentUser, canWrite, canResolve, isReadOnly, type TokenPayload } from "@/lib/auth";
+import {
+  getCurrentUser,
+  canWrite,
+  canResolve,
+  isReadOnly,
+  logout as performLogout,
+  type TokenPayload,
+} from "@/lib/auth";
 
 export interface AuthState {
   user: TokenPayload | null;
@@ -10,9 +25,13 @@ export interface AuthState {
   canResolve: boolean;
   isReadOnly: boolean;
   role: string | undefined;
+  logout: () => Promise<void>;
 }
 
-function buildState(user: TokenPayload | null): AuthState {
+function buildState(
+  user: TokenPayload | null,
+  logoutFn: () => Promise<void>
+): AuthState {
   return {
     user,
     isAuthenticated: user !== null,
@@ -20,16 +39,25 @@ function buildState(user: TokenPayload | null): AuthState {
     canResolve: canResolve(user?.role),
     isReadOnly: isReadOnly(user?.role),
     role: user?.role,
+    logout: logoutFn,
   };
 }
 
 export function useAuth(): AuthState {
-  // Start with empty state (safe for SSR — no localStorage access)
-  const [state, setState] = useState<AuthState>(buildState(null));
+  const [state, setState] = useState<AuthState>(() =>
+    buildState(null, async () => {})
+  );
 
   useEffect(() => {
-    // Runs only on the client after hydration — localStorage is available here
-    setState(buildState(getCurrentUser()));
+    const user = getCurrentUser();
+
+    const handleLogout = async () => {
+      await performLogout();
+      setState(buildState(null, handleLogout));
+      window.location.href = "/login";
+    };
+
+    setState(buildState(user, handleLogout));
   }, []);
 
   return state;

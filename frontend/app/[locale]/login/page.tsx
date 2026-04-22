@@ -1,35 +1,34 @@
 "use client";
 
-// app/login/page.tsx — HouseMind dev login
-// Uses the dev endpoint to create/fetch a user and store their JWT.
-// In production this page still works but the backend will 404 the endpoint.
+/**
+ * app/login/page.tsx — HouseMind
+ *
+ * SEC-23 fix: role selector removed.
+ *   Previously a four-option role picker was rendered but the selected value
+ *   was never sent to the backend.  The backend returns the role stored in the
+ *   database, so the picker was pure UI fiction that misled users about what
+ *   they were signing in as.
+ *
+ * SEC-13 fix: uses storeSession() instead of setToken().
+ *   The JWT itself is now in an httpOnly cookie set by the backend.
+ *   We only store non-secret fields (role, user_id) in localStorage for UI.
+ */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setToken } from "@/lib/auth";
+import { storeSession, setLocale } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
-const ROLES = ["architect", "contractor", "homeowner", "supplier"] as const;
-type Role = typeof ROLES[number];
-
-const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  architect:   "Can create annotations, add items, resolve threads",
-  contractor:  "Can resolve and reopen threads, view all",
-  homeowner:   "Read-only — can view annotations and products",
-  supplier:    "Read-only — can view product details",
-};
-
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("architect@housemind.com");
-  const [role, setRole] = useState<Role>("architect");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [password, setPassword] = useState("");
 
   async function handleLogin() {
-    if (!email.trim()) return;
+    if (!email.trim() || !password) return;
     setLoading(true);
     setError("");
 
@@ -37,6 +36,7 @@ export default function LoginPage() {
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",  // receive the httpOnly cookie
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
@@ -46,10 +46,20 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      setToken(data.access_token);
-      // router.push("/workspace/demo/demo-image?src=https://images.unsplash.com/photo-1555041469-a586c61ea9bc&readOnly=false")
-      // Redirect to workspace demo or home
-      router.push("/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001");
+
+      // SEC-13: store only non-secret fields in localStorage
+      storeSession({
+        access_token: data.access_token,
+        role: data.role,
+        user_id: data.user_id,
+      });
+
+      // Set locale (Thai default for Thai audience)
+      setLocale("th");
+
+      router.push(
+        "/th/workspace/00000002-0000-0000-0000-000000000001/00000003-0000-0000-0000-000000000001"
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -58,18 +68,22 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      
-
-      <div className="login-wrap">
-        <div className="login-card">
-          <div className="login-header">
-            <div className="login-wordmark">House<span>Mind</span></div>
-            <div className="login-sub">Visual decisions workspace</div>
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-header">
+          <div className="login-wordmark">
+            House<span>Mind</span>
           </div>
+          <div className="login-sub">Visual decisions workspace</div>
+        </div>
 
-          <div className="login-body">
-            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+        <div className="login-body">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+          >
             <div className="login-label">Email</div>
             <input
               className="login-input"
@@ -77,7 +91,8 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              onKeyDown={undefined}
+              autoComplete="email"
+              required
             />
 
             <div className="login-label">Password</div>
@@ -87,39 +102,40 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              onKeyDown={undefined}
+              autoComplete="current-password"
+              required
             />
-            
 
-            <div className="login-label" style={{ marginBottom: 8 }}>Role</div>
-            <div className="role-grid">
-              {ROLES.map((r) => (
-                <button
-                  key={r}
-                  className={`role-btn ${role === r ? "selected" : ""}`}
-                  onClick={() => setRole(r)}
-                >
-                  <div className="role-btn-name">{r}</div>
-                  <div className="role-btn-desc">{ROLE_DESCRIPTIONS[r]}</div>
-                </button>
-              ))}
-            </div>
+            {error && <div className="login-error">{error}</div>}
 
             <button
               className="login-submit"
               type="submit"
-              // onClick={handleLogin}
-              // disabled={loading}
+              disabled={loading}
+              style={{ marginTop: 8 }}
             >
-              {loading ? "Signing in…" : "Sign in as " + role}
+              {loading ? "Signing in…" : "Sign in"}
             </button>
-
-            {error && <div className="login-error">{error}</div>}
           </form>
+
+          <div
+            style={{
+              marginTop: 16,
+              textAlign: "center",
+              fontSize: 12,
+              color: "var(--stone-500)",
+            }}
+          >
+            Don&apos;t have an account?{" "}
+            <a
+              href="/th/auth/register"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Register
+            </a>
           </div>
-          
         </div>
       </div>
-    </>
+    </div>
   );
 }

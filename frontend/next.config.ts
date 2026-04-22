@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "s3.ap-southeast-1.amazonaws.com",
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
     // Disable Next.js image optimisation for pre-signed S3 URLs
     // (they are already optimised at upload time and re-signing would break)
