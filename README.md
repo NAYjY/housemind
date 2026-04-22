@@ -5,6 +5,8 @@ A collaborative annotation workspace where architects, contractors, homeowners, 
 **Stack:** Next.js 14 (Vercel) · FastAPI (Railway) · PostgreSQL 15 (Railway) · S3 ap-southeast-1 · JWT magic-link auth · Thai + English i18n
 
 ---
+## This is vibe code
+---
 
 ## Problem
 
