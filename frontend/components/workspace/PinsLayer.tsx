@@ -37,7 +37,13 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
           <div
             key={ann.id}
             className="hm-pin"
-            style={{ left: `${ann.position_x * 100}%`, top: `${ann.position_y * 100}%` }}
+            style={{
+              left: `${ann.position_x * 100}%`,
+              top: `${ann.position_y * 100}%`,
+              // Prevent the browser from hijacking vertical pointer movement
+              // for page scroll while the user is dragging a pin.
+              touchAction: "none",
+            }}
             onPointerDown={(e) => {
               e.stopPropagation();
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -55,6 +61,9 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
               const moved =
                 Math.abs(e.clientX - start.x) > 6 || Math.abs(e.clientY - start.y) > 6;
               if (moved) {
+                // Prevent page scroll while dragging — this is the key fix for
+                // up/down movement being swallowed by the browser scroll handler.
+                e.preventDefault();
                 clearTimeout(timerRefs.current[ann.id]);
                 dragging.current = ann.id;
                 const container = getContainer();
