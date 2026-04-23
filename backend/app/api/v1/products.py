@@ -187,7 +187,51 @@ async def search_products(
         total=total,
     )
 
+# ── GET /products/catalogue ───────────────────────────────────────────────────
+# SEC-07 NOTE: /search is intentionally scoped to a project (shows only
+# already-linked products). This separate endpoint serves the product picker
+# modal — it lets an architect search their own + all supplier products so
+# they can ATTACH them to a project. Requires authentication only.
 
+@router.get("/catalogue", response_model=ProductSearchResponse)
+async def search_catalogue(
+    q: str = Query(default=""),
+    limit: int = Query(default=20, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+) -> ProductSearchResponse:
+    """
+    Global product search for the product picker modal.
+    Returns products from the full catalogue (not scoped to a project).
+    An architect/supplier sees their own products + all supplier products.
+    """
+    stmt = select(Product)
+
+    if q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                Product.name.ilike(like),
+                Product.brand.ilike(like),
+                Product.model.ilike(like),
+            )
+        )
+
+    count_stmt = select(
+        __import__("sqlalchemy", fromlist=["func"]).func.count()
+    ).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar_one()
+
+    stmt = stmt.order_by(Product.created_at.desc()).offset(offset).limit(limit)
+    result = await db.execute(stmt)
+    products = result.scalars().all()
+
+    return ProductSearchResponse(
+        items=[_presign_product(p) for p in products],
+        total=total,
+    )
+    
 # ── GET /products/my ──────────────────────────────────────────────────────────
 
 @router.get("/my", response_model=list[ProductDetail])

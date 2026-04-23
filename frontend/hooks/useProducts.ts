@@ -56,18 +56,19 @@ export function useProjectProducts(projectId: string, objectId?: number | null) 
   });
 }
 
-// Search products
+// Search products — searches GLOBAL catalogue for the picker modal
+// (not project-scoped — that's useProjectProducts)
 export function useProductSearch(q: string, projectId?: string) {
   return useQuery<{ items: ProductDetail[]; total: number }>({
-    queryKey: ["products", "search", q, projectId],
+    queryKey: ["products", "catalogue", q],
     queryFn: async () => {
-      const params = new URLSearchParams({ q });
-      if (projectId) params.set("project_id", projectId);
-      const res = await authFetch(`${API}/products/search?${params}`);
+      const params = new URLSearchParams();
+      if (q.trim()) params.set("q", q.trim());
+      const res = await authFetch(`${API}/products/catalogue?${params}`);
       if (!res.ok) throw new Error("Failed to search products");
       return res.json();
     },
-    enabled: q.trim().length > 0,
+    enabled: true,            // show all products when query is empty too
     staleTime: 30_000,
   });
 }
