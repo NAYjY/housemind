@@ -230,6 +230,7 @@ button { font-family: inherit; }
   inset: 0;
   z-index: 5;
   cursor: crosshair;
+  touch-action: none;
 }
 .hm-canvas-hint {
   position: absolute;

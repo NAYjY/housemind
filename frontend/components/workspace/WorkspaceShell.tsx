@@ -262,7 +262,12 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
           {/* Filmstrip */}
           <div className={`hm-filmstrip ${filmExpanded ? "expanded" : "collapsed"}`}>
-            <div className="hm-tray-row">
+            <div className="hm-tray-row"
+                  onWheel={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.scrollLeft += e.deltaY;
+                }}
+                >
               {slides.map((s, i) => (
                 <div
                   key={s.imageId}
