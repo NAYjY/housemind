@@ -44,6 +44,7 @@ services:
       AWS_ACCESS_KEY_ID: testing
       AWS_SECRET_ACCESS_KEY: testing
       PERSISTENCE: 1
+      LOCALSTACK_VOLUME_DIR: /var/lib/localstack
     ports:
       - "4566:4566"
     volumes:

@@ -10,9 +10,9 @@ echo "Creating HouseMind dev S3 bucket..."
 awslocal s3api create-bucket \
   --bucket housemind-dev-bucket \
   --region ap-southeast-1 \
-  --create-bucket-configuration LocationConstraint=ap-southeast-1
+  --create-bucket-configuration LocationConstraint=ap-southeast-1 \
+  2>/dev/null || echo "Bucket already exists, skipping"
 
-# CORS config for direct browser uploads (presigned PUT)
 awslocal s3api put-bucket-cors \
   --bucket housemind-dev-bucket \
   --cors-configuration '{
