@@ -1,12 +1,13 @@
 """
 app/schemas/auth.py — HouseMind
-Pydantic schemas for magic-link invite flow and JWT responses.
 """
 from __future__ import annotations
 
+import re
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -14,37 +15,40 @@ class RegisterRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     role: str = Field(pattern=r"^(architect|contractor|homeowner|supplier)$")
 
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        return v
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 class InviteCreateRequest(BaseModel):
-    """Architect creates a user account directly — no magic link."""
+    """Architect adds an existing registered user to a project."""
     project_id: UUID
-    invitee_email: EmailStr
-    invitee_role: str = Field(pattern=r"^(contractor|homeowner|supplier)$")
-    invitee_name: str = Field(min_length=1, max_length=255)
-    temp_password: str = Field(min_length=8)
+    user_id: UUID
+    role: str = Field(pattern=r"^(contractor|homeowner|supplier)$")
 
 
 class InviteCreateResponse(BaseModel):
-    """Response after invite is created — magic link is emailed, not returned here"""
-    invite_id: UUID
-    invitee_email: str
-    invitee_role: str
-    status: str  # "pending"
-
-
-class MagicLinkRedeemRequest(BaseModel):
-    """Body for POST /api/v1/auth/redeem — user clicks magic link"""
-    token: str
+    project_id: UUID
+    user_id: UUID
+    role: str
+    status: str  # "added"
 
 
 class TokenResponse(BaseModel):
-    """JWT returned after successful magic-link redemption"""
     access_token: str
     token_type: str = "bearer"
-    expires_in: int   # seconds
+    expires_in: int
     role: str
     user_id: str

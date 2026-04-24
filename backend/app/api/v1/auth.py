@@ -1,31 +1,22 @@
 """
 app/api/v1/auth.py — HouseMind
-Email/password auth: register, login, logout, architect-creates-user.
+Email/password auth + architect invite flow.
 
-Security fixes:
+Endpoints:
+  POST /auth/register   — self-registration (all roles)
+  POST /auth/login      — email + password
+  POST /auth/logout     — revoke jti
+  POST /invites         — architect adds an existing user to a project
 
-SEC-05  Rate limiting via slowapi — login: 10/minute, register: 5/minute.
-        Add `slowapi` to requirements.txt and wire limiter in main.py.
-
-SEC-06  Timing oracle fixed — always run bcrypt regardless of whether the
-        user exists.  Previously short-circuiting on unknown email allowed
-        account enumeration via response latency.
-
-SEC-10  JWT now contains a `jti` (uuid4) claim.  Logout endpoint inserts
-        the jti into revoked_tokens so it is rejected by get_current_user.
-
-SEC-13  Login/register/redeem set an httpOnly cookie containing the JWT.
-        The token is also returned in the response body for API clients and
-        local dev where the Vercel proxy is absent.
-
-SEC-20  Password strength validator enforces: 8+ chars, 1 upper, 1 lower,
-        1 digit.  Plain "password" or "12345678" are rejected at schema level.
-
-SEC-21  POST /auth/logout — revokes the current token's jti.
+Flow for non-architects:
+  1. Contractor/homeowner/supplier registers at /register (self-service)
+  2. They share their email with the architect
+  3. Architect searches by email in InviteModal → POST /invites
+  4. User is added to project_members immediately
+  5. Next login they see the project in their profile
 """
 from __future__ import annotations
 
-import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -38,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user, require_architect
 from app.config import settings
 from app.db.session import get_db
+from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.revoked_token import RevokedToken
 from app.models.user import User
@@ -51,15 +43,13 @@ from app.schemas.auth import (
 
 router = APIRouter(tags=["auth"])
 
-# SEC-09: hardcoded — never read from env
-_JWT_ALGORITHM = "HS256"
+_JWT_ALGORITHM = "HS256"  # SEC-09: never configurable via env
 
-# ── Dummy hash for timing-safe login (SEC-06) ─────────────────────────────────
-# Pre-computed at import time so it is available without blocking I/O.
+# SEC-06: pre-computed dummy hash for timing-safe login
 _DUMMY_HASH = bcrypt.hashpw(b"__dummy__", bcrypt.gensalt(settings.BCRYPT_ROUNDS)).decode()
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _hash_password(password: str) -> str:
     return bcrypt.hashpw(
@@ -73,34 +63,25 @@ def _verify_password(password: str, hashed: str) -> bool:
 
 
 def _issue_token(user: User) -> tuple[str, str, datetime]:
-    """
-    Issue a signed JWT.  Returns (token, jti, expires_at).
-
-    SEC-10: jti claim added — required for revocation support.
-    SEC-09: algorithm hardcoded to HS256.
-    """
+    """Returns (jwt_string, jti, expires_at). SEC-10: jti for revocation."""
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     jti = str(uuid.uuid4())
     payload = {
-        "sub": str(user.id),
+        "sub":     str(user.id),
         "user_id": str(user.id),
-        "email": user.email,
-        "role": user.role,
-        "jti": jti,
-        "exp": expire,
-        "iat": now,
+        "email":   user.email,
+        "role":    user.role,
+        "jti":     jti,
+        "exp":     expire,
+        "iat":     now,
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm=_JWT_ALGORITHM)
     return token, jti, expire
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
-    """
-    SEC-13: set httpOnly cookie so the JWT is inaccessible to JavaScript.
-    secure=True in non-local environments (requires HTTPS).
-    samesite="lax" works through the Vercel reverse proxy in production.
-    """
+    """SEC-13: httpOnly cookie, secure outside local/test."""
     is_secure = settings.ENVIRONMENT not in ("local", "test")
     response.set_cookie(
         key="hm_token",
@@ -113,8 +94,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
-def _token_response(user: User) -> tuple[TokenResponse, str]:
-    """Returns (schema_response, raw_token)."""
+def _build_token_response(user: User) -> tuple[TokenResponse, str]:
     token, _jti, _exp = _issue_token(user)
     return (
         TokenResponse(
@@ -130,7 +110,6 @@ def _token_response(user: User) -> tuple[TokenResponse, str]:
 
 # ── POST /auth/register ───────────────────────────────────────────────────────
 
-# NOTE: Decorate with @limiter.limit("5/minute") in main.py after wiring slowapi.
 @router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: Request,
@@ -139,16 +118,15 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """
-    Self-registration — primarily for architects.
-    SEC-05: rate-limited (wire @limiter.limit in main.py).
-    SEC-13: sets httpOnly cookie alongside response body.
-    SEC-20: password strength enforced by RegisterRequest schema validator.
+    Self-registration for all roles.
+    Non-architects (contractor/homeowner/supplier) register here,
+    then share their email so an architect can add them to a project.
     """
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+            detail="Email already registered · อีเมลนี้มีบัญชีอยู่แล้ว",
         )
 
     user = User(
@@ -161,14 +139,13 @@ async def register(
     db.add(user)
     await db.flush()
 
-    resp_body, token = _token_response(user)
+    resp_body, token = _build_token_response(user)
     _set_auth_cookie(response, token)
     return resp_body
 
 
 # ── POST /auth/login ──────────────────────────────────────────────────────────
 
-# NOTE: Decorate with @limiter.limit("10/minute") in main.py after wiring slowapi.
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(
     request: Request,
@@ -177,35 +154,27 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """
-    SEC-06 timing oracle fix: always run _verify_password even when the user
-    does not exist.  Previously the code short-circuited on `not user`, making
-    unknown emails ~300ms faster than known emails and enabling account
-    enumeration via latency.
-
-    SEC-13: sets httpOnly cookie.
+    SEC-06: always run bcrypt even when user doesn't exist.
+    Prevents account enumeration via response timing.
     """
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
-    # SEC-06: always call bcrypt regardless of whether user exists.
-    # If user is None or has no password_hash, compare against a dummy hash so
-    # the timing is identical to a real failed login.
-    candidate_hash = (user.password_hash if user and user.password_hash else _DUMMY_HASH)
+    candidate_hash = user.password_hash if (user and user.password_hash) else _DUMMY_HASH
     password_ok = _verify_password(body.password, candidate_hash)
 
     if not user or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Invalid email or password · อีเมลหรือรหัสผ่านไม่ถูกต้อง",
         )
-
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
         )
 
-    resp_body, token = _token_response(user)
+    resp_body, token = _build_token_response(user)
     _set_auth_cookie(response, token)
     return resp_body
 
@@ -218,68 +187,91 @@ async def logout(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
+    """SEC-10: insert jti into revoked_tokens so token is rejected before expiry."""
     jti = user.get("jti")
     if jti:
-        from datetime import datetime, timedelta, timezone
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
-        revoked = RevokedToken(
+        db.add(RevokedToken(
             jti=jti,
             user_id=uuid.UUID(user["user_id"]),
             expires_at=expires_at,
-        )
-        db.add(revoked)
+        ))
         await db.flush()
 
     response.delete_cookie(key="hm_token", path="/")
     return Response(status_code=204)
 
 
-# ── POST /invites — architect creates collaborator account ────────────────────
+# ── POST /invites ─────────────────────────────────────────────────────────────
 
 @router.post("/invites", response_model=InviteCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_invite(
     body: InviteCreateRequest,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_architect),
+    caller: dict = Depends(require_architect),
 ) -> InviteCreateResponse:
     """
-    Architect creates an account for a collaborator directly.
-    SEC-04: new user is added to project_members so require_project_member
-    works for them immediately.
+    Add an existing registered user to a project.
+
+    The architect uses InviteModal to search users by email/name,
+    selects one, assigns a role, and submits.
+    This endpoint adds them to project_members immediately —
+    no email sent, no token, no expiry.
     """
-    result = await db.execute(select(User).where(User.email == body.invitee_email))
-    existing = result.scalar_one_or_none()
-    if existing:
+    # Architect must own the project
+    proj_result = await db.execute(
+        select(Project).where(
+            Project.id == body.project_id,
+            Project.architect_id == uuid.UUID(caller["user_id"]),
+            Project.status != "archived",
+        )
+    )
+    if not proj_result.scalar_one_or_none():
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email already exists",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found or you don't own it",
         )
 
-    user = User(
-        id=uuid.uuid4(),
-        email=body.invitee_email,
-        full_name=body.invitee_name,
-        role=body.invitee_role,
-        password_hash=_hash_password(body.temp_password),
+    # Target user must exist and be active
+    user_result = await db.execute(
+        select(User).where(
+            User.id == body.user_id,
+            User.is_active == True,
+        )
     )
-    db.add(user)
-    await db.flush()
+    if not user_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
 
-    # SEC-04: add to project_members immediately so membership checks pass.
+    # Idempotency — already a member?
+    existing = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == body.project_id,
+            ProjectMember.user_id == body.user_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User is already a member of this project",
+        )
+
     member = ProjectMember(
         id=uuid.uuid4(),
         project_id=body.project_id,
-        user_id=user.id,
-        role=body.invitee_role,
+        user_id=body.user_id,
+        role=body.role,
     )
     db.add(member)
     await db.flush()
 
     return InviteCreateResponse(
-        invite_id=user.id,
-        invitee_email=user.email,
-        invitee_role=user.role,
-        status="created",
+        project_id=body.project_id,
+        user_id=body.user_id,
+        role=body.role,
+        status="added",
     )

@@ -184,6 +184,24 @@ async def seed(session: AsyncSession) -> None:
         })
     print("  ✓ Invite records seeded")
 
+    # ── Project members (SEC-04: required for require_project_member checks) ──────
+    await session.execute(text("""
+        INSERT INTO project_members (id, project_id, user_id, role, joined_at)
+        VALUES
+        (gen_random_uuid(), :project_id, :architect_id,  'architect',  NOW()),
+        (gen_random_uuid(), :project_id, :contractor_id, 'contractor', NOW()),
+        (gen_random_uuid(), :project_id, :homeowner_id,  'homeowner',  NOW()),
+        (gen_random_uuid(), :project_id, :supplier_id,   'supplier',   NOW())
+        ON CONFLICT ON CONSTRAINT uq_project_members_project_user DO NOTHING
+    """), {
+        "project_id": PROJECT_ID,
+        "architect_id": ARCHITECT_ID,
+        "contractor_id": CONTRACTOR_ID,
+        "homeowner_id": HOMEOWNER_ID,
+        "supplier_id": SUPPLIER_ID,
+    })
+    print("  ✓ Project members seeded")
+
     await session.commit()
 
     print()
