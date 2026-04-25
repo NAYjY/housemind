@@ -26,3 +26,4 @@
 *.pyc
 /.next
 frontend/.next
+backend/uploads

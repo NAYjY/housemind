@@ -3,7 +3,7 @@
 # Runs inside LocalStack on startup to create the dev S3 bucket.
 # This script is mounted at /etc/localstack/init/ready.d/
 
-set -e
+
 
 echo "Creating HouseMind dev S3 bucket..."
 

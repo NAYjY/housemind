@@ -26,5 +26,6 @@ export function useProjectImages(projectId: string) {
     enabled: !!projectId && projectId !== "demo",
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
+    refetchOnMount: true,         // always refetch when component remounts
   });
 }

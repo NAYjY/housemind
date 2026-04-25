@@ -549,8 +549,17 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         {/* Canvas */}
         <div className="hm-canvas-wrap">
           {activeSlide.url && (
-            <img className="hm-canvas-img" src={activeSlide.url} alt={activeSlide.label} />
-          )}
+        <img
+          className="hm-canvas-img"
+          src={activeSlide.url}
+          alt={activeSlide.label}
+          onError={() => {
+            if (projectId !== "demo") {
+              refetchImages();
+            }
+          }}
+        />          
+        )}
 
           <div
             ref={canvasRef}

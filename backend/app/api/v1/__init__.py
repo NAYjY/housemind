@@ -1,4 +1,5 @@
 """app/api/v1/__init__.py — HouseMind"""
+import os
 from fastapi import APIRouter
 
 from app.api.v1.annotations import router as annotations_router
@@ -16,3 +17,7 @@ router.include_router(annotations_router)
 router.include_router(images_router)
 router.include_router(products_router)
 router.include_router(users_router)
+
+if os.getenv("ENVIRONMENT", "local") in ("local", "test"):
+    from app.api.v1.uploads import router as uploads_router
+    router.include_router(uploads_router)
