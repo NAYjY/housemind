@@ -5,9 +5,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { useProjects, useCreateProject, type ProjectListItem } from "@/hooks/useProjects";
-import { clearToken } from "@/lib/auth";
-import { InviteModal } from "@/components/project/InviteModal";  // ← import
+import { useProjects, useCreateProject, type ProjectListItem, type ProjectDetail } from "@/hooks/useProjects";
+import { clearToken, authFetch } from "@/lib/auth";
+import { InviteModal } from "@/components/project/InviteModal";
+
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 const ROLES = ["architect", "contractor", "homeowner", "supplier"] as const;
 type Role = typeof ROLES[number];
@@ -56,7 +58,6 @@ function ProjectCard({ project, onClick, onInvite, isArchitect }: ProjectCardPro
         </svg>
       </div>
 
-      {/* Invite button — only for architects */}
       {isArchitect && (
         <button
           onClick={(e) => { e.stopPropagation(); onInvite(); }}
@@ -162,8 +163,6 @@ export default function ProfilePage() {
 
   const [activeRole, setActiveRole] = useState<Role>((auth.role as Role) ?? "architect");
   const [createModalOpen, setCreateModalOpen] = useState(false);
-
-  // ← invite state: which project is being invited to
   const [inviteProject, setInviteProject] = useState<ProjectListItem | null>(null);
 
   function handleSignOut() {
@@ -171,8 +170,21 @@ export default function ProfilePage() {
     router.push("/login");
   }
 
-  function handleProjectClick(project: ProjectListItem) {
-    // Navigate to workspace — pick first image or let workspace handle it
+  // Navigate to first subproject if available, else to main project shell
+  async function handleProjectClick(project: ProjectListItem) {
+    try {
+      const res = await authFetch(`${API}/projects/${project.id}`);
+      if (res.ok) {
+        const detail = await res.json() as ProjectDetail;
+        if (detail.subprojects.length > 0) {
+          const first = detail.subprojects[0]!;
+          router.push(`/th/workspace/${first.id}/${first.id}`);
+          return;
+        }
+      }
+    } catch {
+      // fall through to main project shell
+    }
     router.push(`/th/workspace/${project.id}/${project.id}`);
   }
 
@@ -186,7 +198,6 @@ export default function ProfilePage() {
   return (
     <div className="profile-wrap">
 
-      {/* ── Modals ── */}
       {createModalOpen && (
         <CreateProjectModal
           onClose={() => setCreateModalOpen(false)}
@@ -194,7 +205,6 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* ← InviteModal — opens when architect clicks "+ เชิญ" on a project */}
       {inviteProject && (
         <InviteModal
           projectId={inviteProject.id}
@@ -264,7 +274,7 @@ export default function ProfilePage() {
                   key={p.id}
                   project={p}
                   onClick={() => handleProjectClick(p)}
-                  onInvite={() => setInviteProject(p)}   // ← wire invite
+                  onInvite={() => setInviteProject(p)}
                   isArchitect={auth.role === "architect"}
                 />
               ))}

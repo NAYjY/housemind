@@ -52,3 +52,39 @@ export function useCreateProject() {
     },
   });
 }
+
+/** GET /projects/{projectId} — detail + subprojects list */
+export function useProjectDetail(projectId: string) {
+  return useQuery<ProjectDetail>({
+    queryKey: ["project", projectId],
+    queryFn: async () => {
+      const res = await authFetch(`${API}/projects/${projectId}`);
+      if (!res.ok) throw new Error("Failed to fetch project");
+      return res.json();
+    },
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** POST /projects/{parentId}/sub — create subproject under a main project */
+export function useCreateSubProject(parentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; description?: string }) => {
+      const res = await authFetch(`${API}/projects/${parentId}/sub`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail ?? "Failed to create subproject");
+      }
+      return res.json() as Promise<ProjectDetail>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project", parentId] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
