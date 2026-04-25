@@ -41,7 +41,6 @@ export function useMyProducts() {
 }
 
 // Project products (all products linked to project)
-// useProjectProducts — add optional object_id filter
 export function useProjectProducts(projectId: string, objectId?: number | null) {
   return useQuery<ProductDetail[]>({
     queryKey: ["products", "project", projectId, objectId ?? "all"],
@@ -57,7 +56,6 @@ export function useProjectProducts(projectId: string, objectId?: number | null) 
 }
 
 // Search products — searches GLOBAL catalogue for the picker modal
-// (not project-scoped — that's useProjectProducts)
 export function useProductSearch(q: string, projectId?: string) {
   return useQuery<{ items: ProductDetail[]; total: number }>({
     queryKey: ["products", "catalogue", q],
@@ -68,7 +66,7 @@ export function useProductSearch(q: string, projectId?: string) {
       if (!res.ok) throw new Error("Failed to search products");
       return res.json();
     },
-    enabled: true,            // show all products when query is empty too
+    enabled: true,
     staleTime: 30_000,
   });
 }
@@ -95,7 +93,6 @@ export function useCreateProduct() {
 export function useProductThumbnailUpload() {
   return useMutation({
     mutationFn: async (file: File) => {
-      // Step 1: get presigned URL
       const presignRes = await authFetch(`${API}/products/thumbnail-url`, {
         method: "POST",
         body: JSON.stringify({
@@ -106,7 +103,6 @@ export function useProductThumbnailUpload() {
       if (!presignRes.ok) throw new Error("Could not get upload URL");
       const { upload_url, s3_key } = await presignRes.json();
 
-      // Step 2: PUT to S3
       const s3Res = await fetch(upload_url, {
         method: "PUT",
         body: file,
@@ -119,21 +115,27 @@ export function useProductThumbnailUpload() {
   });
 }
 
-// useLinkProduct — now needs object_id
+// useLinkProduct — FIX: project_id must be a query param so require_project_owner
+// can read it from request.query_params. Sending it only in the JSON body is
+// invisible to the FastAPI dependency.
 export function useLinkProduct(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ productId, objectId }: { productId: string; objectId: number }) => {
-      const res = await authFetch(`${API}/products/link`, {
+      // ✅ project_id in query string (required by require_project_owner)
+      const res = await authFetch(`${API}/products/link?project_id=${projectId}`, {
         method: "POST",
-        body: JSON.stringify({ 
-          project_id: projectId, 
-          object_id: objectId,   // add this
-          product_id: productId 
+        body: JSON.stringify({
+          project_id: projectId,  // also in body for ObjectProductCreate schema
+          object_id: objectId,
+          product_id: productId,
         }),
       });
-      if (res.status === 409) return;
-      if (!res.ok) throw new Error("Failed to link product");
+      if (res.status === 409) return; // already linked — idempotent, not an error
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail ?? "Failed to link product");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -142,14 +144,16 @@ export function useLinkProduct(projectId: string) {
   });
 }
 
-// Unlink product from project
+// useUnlinkProduct — FIX: same issue, project_id must be a query param
 export function useUnlinkProduct(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (objectProductId: string) => {
-      const res = await authFetch(`${API}/products/link/${objectProductId}`, {
-        method: "DELETE",
-      });
+      // ✅ project_id in query string (required by require_project_owner)
+      const res = await authFetch(
+        `${API}/products/link/${objectProductId}?project_id=${projectId}`,
+        { method: "DELETE" }
+      );
       if (!res.ok) throw new Error("Failed to unlink product");
     },
     onSuccess: () => {
