@@ -379,8 +379,9 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     useSlides({ initialImageId: imageId, initialImageUrl: imageUrl, dbImages });
 
   const handleUploadSuccess = useCallback(async () => {
-    resetSeed();
     await refetchImages();
+    resetSeed();
+    
   }, [resetSeed, refetchImages]);
 
   const { uploading, uploadError, uploadFile, submitUrl } = useImageUpload({
