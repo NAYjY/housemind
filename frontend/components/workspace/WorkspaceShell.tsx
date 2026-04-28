@@ -48,30 +48,17 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
+  const [deleteSubTarget, setDeleteSubTarget] = useState<{ id: string; name: string } | null>(null);
 
-  // If shell: fetch the main project directly. If subproject: fetch parent.
-  // We need parent_project_id to know who to query for siblings.
   const { data: currentProject } = useProjectDetail(projectId);
-
-  // parentId: if shell → projectId itself. If subproject → parent_project_id.
-  const parentId = isShell
-    ? projectId
-    : (currentProject?.parent_project_id ?? null);
-
-  const { data: parentDetail, refetch: refetchParent } = useProjectDetail(
-    parentId ?? ""
-  );
-
+  const parentId = isShell ? projectId : (currentProject?.parent_project_id ?? null);
+  const { data: parentDetail, refetch: refetchParent } = useProjectDetail(parentId ?? "");
   const createSub = useCreateSubProject(parentId ?? "");
   const deleteSub = useDeleteSubProject(parentId ?? "");
-  const [deleteSubTarget, setDeleteSubTarget] = useState<{ id: string; name: string } | null>(null);
+
   const subprojects = parentDetail?.subprojects ?? [];
   const parentName = parentDetail?.name ?? "";
-
-  // Label shown in the nav bar
-  const currentLabel = isShell
-    ? (parentDetail?.name ?? "…")
-    : (currentProject?.name ?? "…");
+  const currentLabel = isShell ? (parentDetail?.name ?? "…") : (currentProject?.name ?? "…");
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -98,20 +85,9 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
 
   return (
     <div style={{ position: "relative" }}>
-      {/* Trigger */}
-      <button
-        onClick={() => { setOpen((v) => !v); setShowAddForm(false); }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: "2px 0",
-        }}
-      >
-        {deleteSubTarget && (
+
+      {/* Delete confirm — fixed overlay, outside button and dropdown */}
+      {deleteSubTarget && (
         <div
           style={{
             position: "fixed", inset: 0, zIndex: 500,
@@ -155,6 +131,15 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
           </div>
         </div>
       )}
+
+      {/* Trigger button */}
+      <button
+        onClick={() => { setOpen((v) => !v); setShowAddForm(false); }}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          background: "none", border: "none", cursor: "pointer", padding: "2px 0",
+        }}
+      >
         <div>
           {!isShell && (
             <div style={{ fontSize: 10, color: "#888780", letterSpacing: "0.06em", textAlign: "left" }}>
@@ -176,44 +161,29 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
       {/* Dropdown */}
       {open && (
         <>
-          {/* Backdrop */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 48 }}
             onClick={() => {
-              if (deleteSubTarget) return; // don't close while confirm is showing
+              if (deleteSubTarget) return;
               setOpen(false);
               setShowAddForm(false);
             }}
           />
 
           <div style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            left: 0,
-            zIndex: 49,
-            background: "#fff",
-            border: "0.5px solid #E8E6E0",
-            borderRadius: 14,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-            minWidth: 220,
-            maxWidth: 280,
+            position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 49,
+            background: "#fff", border: "0.5px solid #E8E6E0", borderRadius: 14,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)", minWidth: 220, maxWidth: 280,
             overflow: "hidden",
           }}>
-
-            {/* Parent label */}
             <div style={{
-              padding: "10px 14px 6px",
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: "#B0A090",
-              borderBottom: "0.5px solid #F5F4F0",
+              padding: "10px 14px 6px", fontSize: 10, fontWeight: 700,
+              letterSpacing: "0.1em", textTransform: "uppercase",
+              color: "#B0A090", borderBottom: "0.5px solid #F5F4F0",
             }}>
               {parentName} · โครงการย่อย
             </div>
 
-            {/* Subproject list */}
             {subprojects.length === 0 && (
               <div style={{ padding: "12px 14px", fontSize: 12, color: "#B0A090" }}>
                 ยังไม่มีโครงการย่อย
@@ -238,8 +208,7 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                     }}
                     style={{
                       flex: 1, display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 14px",
-                      background: "transparent", border: "none",
+                      padding: "10px 14px", background: "transparent", border: "none",
                       cursor: isCurrent ? "default" : "pointer",
                       textAlign: "left", fontFamily: "inherit",
                     }}
@@ -249,8 +218,7 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                       background: isCurrent ? "#C49A3C" : "#F5F4F0",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 12, fontWeight: 700,
-                      color: isCurrent ? "#fff" : "#888780",
-                      flexShrink: 0,
+                      color: isCurrent ? "#fff" : "#888780", flexShrink: 0,
                     }}>
                       {sub.name[0]?.toUpperCase() ?? "S"}
                     </div>
@@ -281,24 +249,14 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
               );
             })}
 
-            {/* Add subproject */}
             {!showAddForm ? (
               <button
                 onClick={() => setShowAddForm(true)}
                 style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 14px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontFamily: "inherit",
-                  color: "#8B6520",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  padding: "10px 14px", background: "transparent", border: "none",
+                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  color: "#8B6520", fontSize: 13, fontWeight: 500,
                 }}
               >
                 <span style={{
@@ -320,12 +278,9 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="เช่น ห้องนอน, ห้องน้ำ"
                   style={{
-                    width: "100%", height: 36,
-                    border: "0.5px solid #E8E6E0", borderRadius: 8,
-                    padding: "0 10px", fontSize: 12,
-                    fontFamily: "inherit", outline: "none",
-                    background: "#fff", color: "#1A1A18",
-                    boxSizing: "border-box", marginBottom: 6,
+                    width: "100%", height: 36, border: "0.5px solid #E8E6E0", borderRadius: 8,
+                    padding: "0 10px", fontSize: 12, fontFamily: "inherit", outline: "none",
+                    background: "#fff", color: "#1A1A18", boxSizing: "border-box", marginBottom: 6,
                   }}
                 />
                 <input
@@ -333,17 +288,12 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="รายละเอียด (optional)"
                   style={{
-                    width: "100%", height: 36,
-                    border: "0.5px solid #E8E6E0", borderRadius: 8,
-                    padding: "0 10px", fontSize: 12,
-                    fontFamily: "inherit", outline: "none",
-                    background: "#fff", color: "#1A1A18",
-                    boxSizing: "border-box", marginBottom: 8,
+                    width: "100%", height: 36, border: "0.5px solid #E8E6E0", borderRadius: 8,
+                    padding: "0 10px", fontSize: 12, fontFamily: "inherit", outline: "none",
+                    background: "#fff", color: "#1A1A18", boxSizing: "border-box", marginBottom: 8,
                   }}
                 />
-                {formError && (
-                  <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{formError}</div>
-                )}
+                {formError && <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{formError}</div>}
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
@@ -375,7 +325,6 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
     </div>
   );
 }
-
 // ── Shell view (main project with no canvas) ──────────────────────────────────
 
 function ShellView({ projectId }: { projectId: string }) {
@@ -417,6 +366,35 @@ function ShellView({ projectId }: { projectId: string }) {
           กดชื่อโครงการด้านบนเพื่อเลือกหรือเพิ่มโครงการย่อย
         </div>
       </div>
+    </div>
+  );
+}
+
+interface FilmThumbProps {
+  slide: { imageId: string; url: string; label: string };
+  index: number;
+  isActive: boolean;
+  canDelete: boolean;
+  onSelect: () => void;
+  onLongPress: () => void;
+}
+
+function FilmThumb({ slide, index, isActive, canDelete, onSelect, onLongPress }: FilmThumbProps) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  return (
+    <div
+      className={`hm-film-thumb ${isActive ? "active" : ""}`}
+      onClick={onSelect}
+      onPointerDown={() => {
+        if (!canDelete) return;
+        timerRef.current = setTimeout(onLongPress, 600);
+      }}
+      onPointerUp={() => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } }}
+      onPointerLeave={() => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } }}
+    >
+      {slide.url && <img src={slide.url} alt={slide.label} />}
+      <span style={{ position: "relative", zIndex: 1 }}>{index + 1}</span>
     </div>
   );
 }
@@ -732,32 +710,20 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
                 e.currentTarget.scrollLeft += e.deltaY;
               }}
             >
-              {slides.map((s, i) => {
-                const imgLongPressTimer = { current: null as ReturnType<typeof setTimeout> | null };
-                return (
-                  <div
-                    key={s.imageId}
-                    className={`hm-film-thumb ${i === currentSlide ? "active" : ""}`}
-                    onClick={() => handleSlideChange(i)}
-                    onPointerDown={(e) => {
-                      if (!auth.canWrite || s.imageId.startsWith("local-")) return;
-                      imgLongPressTimer.current = setTimeout(() => {
-                        const annCount = (useAnnotationStore.getState().annotationsByImage[s.imageId] ?? []).length;
-                        setDeleteImageTarget({ id: s.imageId, label: s.label, annotationCount: annCount });
-                      }, 600);
-                    }}
-                    onPointerUp={() => {
-                      if (imgLongPressTimer.current) clearTimeout(imgLongPressTimer.current);
-                    }}
-                    onPointerLeave={() => {
-                      if (imgLongPressTimer.current) clearTimeout(imgLongPressTimer.current);
-                    }}
-                  >
-                    {s.url && <img src={s.url} alt={s.label} />}
-                    <span style={{ position: "relative", zIndex: 1 }}>{i + 1}</span>
-                  </div>
-                );
-              })}
+              {slides.map((s, i) => (
+                <FilmThumb
+                  key={s.imageId}
+                  slide={s}
+                  index={i}
+                  isActive={i === currentSlide}
+                  canDelete={auth.canWrite && !s.imageId.startsWith("local-")}
+                  onSelect={() => handleSlideChange(i)}
+                  onLongPress={() => {
+                    const annCount = (useAnnotationStore.getState().annotationsByImage[s.imageId] ?? []).length;
+                    setDeleteImageTarget({ id: s.imageId, label: s.label, annotationCount: annCount });
+                  }}
+                />
+              ))}
               <button className="hm-film-add" onClick={() => setFilmExpanded((v) => !v)}>
                 <span className="hm-film-add-icon">+</span>
                 <span className="hm-film-add-label">Add</span>
