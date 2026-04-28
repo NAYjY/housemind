@@ -397,6 +397,31 @@ async def unlink_product_from_project(
     await db.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+# ── DELETE /products/link-by-product ─────────────────────────────────────────
+
+@router.delete("/link-by-product", status_code=status.HTTP_204_NO_CONTENT)
+async def unlink_product_by_product_id(
+    project_id: uuid.UUID = Query(...),
+    product_id: uuid.UUID = Query(...),
+    object_id: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_project_owner),
+) -> Response:
+    """Unlink a product from a project object by product_id + object_id."""
+    result = await db.execute(
+        select(ObjectProduct).where(
+            ObjectProduct.project_id == project_id,
+            ObjectProduct.product_id == product_id,
+            ObjectProduct.object_id == object_id,
+        )
+    )
+    op = result.scalar_one_or_none()
+    if not op:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
+    await db.delete(op)
+    await db.flush()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 # ── DELETE /projects/{project_id} ─────────────────────────────────────────────
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -12,7 +12,7 @@ import {
 } from "@/hooks/useAnnotations";
 import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
-import { useProjectImages } from "@/hooks/useProjectImages";
+import { useProjectImages, useDeleteProjectImage } from "@/hooks/useProjectImages";
 import { useLinkProduct, type ProductDetail } from "@/hooks/useProducts";
 import { useProjectDetail, useCreateSubProject, useDeleteSubProject } from "@/hooks/useProjects";
 import { ProductDetailPanel } from "@/components/annotation/ProductDetailPanel";
@@ -397,6 +397,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     
   }, [resetSeed, refetchImages]);
 
+  const deleteImageMutation = useDeleteProjectImage(projectId);
   const { uploading, uploadError, uploadFile, submitUrl } = useImageUpload({
     projectId,
     isAuthenticated: auth.isAuthenticated,
@@ -410,6 +411,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
   const [fanPos, setFanPos] = useState({ x: 0, y: 0 });
   const [pendingPos, setPendingPos] = useState({ normX: 0, normY: 0 });
   const [deleteTarget, setDeleteTarget] = useState<Annotation | null>(null);
+  const [deleteImageTarget, setDeleteImageTarget] = useState<{ id: string; label: string; annotationCount: number } | null>(null);
   const [activePinId, setActivePinId] = useState<string | null>(null);
   const [activeProduct, setActiveProduct] = useState<ProductDetail | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -501,6 +503,60 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
         <FanEmojiMenu pos={fanPos} onPick={handleEmojiPick} onClose={() => setFanVisible(false)} />
       )}
 
+      {deleteImageTarget && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
+            width: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>🖼️</div>
+            <div style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 4 }}>
+              ลบรูปภาพนี้?
+            </div>
+            <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 8, lineHeight: 1.5 }}>
+              {deleteImageTarget.label}
+            </div>
+            {deleteImageTarget.annotationCount > 0 && (
+              <div style={{
+                fontSize: 12, color: "#C05A30",
+                background: "#FEF0E8", border: "0.5px solid #FAD9C8",
+                borderRadius: 8, padding: "8px 12px", marginBottom: 16,
+                textAlign: "center",
+              }}>
+                ⚠ จะลบ {deleteImageTarget.annotationCount} annotation ด้วย
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button
+                onClick={() => setDeleteImageTarget(null)}
+                style={{ flex: 1, height: 40, borderRadius: 10, border: "0.5px solid #ddd", background: "#f5f5f5", fontSize: 13, cursor: "pointer" }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteImageMutation.mutateAsync(deleteImageTarget.id);
+                  setDeleteImageTarget(null);
+                  if (activeSlide.imageId === deleteImageTarget.id) handleSlideChange(0);
+                  await refetchImages();
+                  resetSeed();
+                }}
+                disabled={deleteImageMutation.isPending}
+                style={{ flex: 1, height: 40, borderRadius: 10, border: "none", background: "#E24B4A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: deleteImageMutation.isPending ? 0.5 : 1 }}
+              >
+                {deleteImageMutation.isPending ? "กำลังลบ…" : "ลบ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {deleteTarget && (
         <DeleteConfirmPopup
           annotation={deleteTarget}
@@ -628,16 +684,32 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
                 e.currentTarget.scrollLeft += e.deltaY;
               }}
             >
-              {slides.map((s, i) => (
-                <div
-                  key={s.imageId}
-                  className={`hm-film-thumb ${i === currentSlide ? "active" : ""}`}
-                  onClick={() => handleSlideChange(i)}
-                >
-                  {s.url && <img src={s.url} alt={s.label} />}
-                  <span style={{ position: "relative", zIndex: 1 }}>{i + 1}</span>
-                </div>
-              ))}
+              {slides.map((s, i) => {
+                const imgLongPressTimer = { current: null as ReturnType<typeof setTimeout> | null };
+                return (
+                  <div
+                    key={s.imageId}
+                    className={`hm-film-thumb ${i === currentSlide ? "active" : ""}`}
+                    onClick={() => handleSlideChange(i)}
+                    onPointerDown={(e) => {
+                      if (!auth.canWrite || s.imageId.startsWith("local-")) return;
+                      imgLongPressTimer.current = setTimeout(() => {
+                        const annCount = (useAnnotationStore.getState().annotationsByImage[s.imageId] ?? []).length;
+                        setDeleteImageTarget({ id: s.imageId, label: s.label, annotationCount: annCount });
+                      }, 600);
+                    }}
+                    onPointerUp={() => {
+                      if (imgLongPressTimer.current) clearTimeout(imgLongPressTimer.current);
+                    }}
+                    onPointerLeave={() => {
+                      if (imgLongPressTimer.current) clearTimeout(imgLongPressTimer.current);
+                    }}
+                  >
+                    {s.url && <img src={s.url} alt={s.label} />}
+                    <span style={{ position: "relative", zIndex: 1 }}>{i + 1}</span>
+                  </div>
+                );
+              })}
               <button className="hm-film-add" onClick={() => setFilmExpanded((v) => !v)}>
                 <span className="hm-film-add-icon">+</span>
                 <span className="hm-film-add-label">Add</span>

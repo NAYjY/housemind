@@ -207,3 +207,20 @@ export function useUnlinkProductFromAnnotation(projectId: string) {
     },
   });
 }
+
+/** DELETE /products/link-by-product — unlink by product+object+project */
+export function useUnlinkProductByProductId(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ productId, objectId }: { productId: string; objectId: number }) => {
+      const res = await authFetch(
+        `${API}/products/link-by-product?project_id=${projectId}&product_id=${productId}&object_id=${objectId}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Failed to unlink product");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products", "project", projectId] });
+    },
+  });
+}

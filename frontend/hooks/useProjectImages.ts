@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -26,6 +26,22 @@ export function useProjectImages(projectId: string) {
     enabled: !!projectId && projectId !== "demo",
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
-    refetchOnMount: true,         // always refetch when component remounts
+    refetchOnMount: true,
+  });
+}
+
+export function useDeleteProjectImage(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (imageId: string) => {
+      const res = await authFetch(
+        `${API}/images/${imageId}?project_id=${projectId}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Failed to delete image");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-images", projectId] });
+    },
   });
 }
