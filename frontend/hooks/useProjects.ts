@@ -87,4 +87,24 @@ export function useCreateSubProject(parentId: string) {
       qc.invalidateQueries({ queryKey: ["projects"] });
     },
   });
+  
+}
+/** DELETE /projects/{projectId} — delete a subproject */
+export function useDeleteSubProject(parentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (subProjectId: string) => {
+      const res = await authFetch(`${API}/projects/${subProjectId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail ?? "Failed to delete subproject");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project", parentId] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
 }

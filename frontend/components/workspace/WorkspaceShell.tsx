@@ -14,7 +14,7 @@ import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectImages } from "@/hooks/useProjectImages";
 import { useLinkProduct, type ProductDetail } from "@/hooks/useProducts";
-import { useProjectDetail, useCreateSubProject } from "@/hooks/useProjects";
+import { useProjectDetail, useCreateSubProject, useDeleteSubProject } from "@/hooks/useProjects";
 import { ProductDetailPanel } from "@/components/annotation/ProductDetailPanel";
 import { ProductPickerModal } from "@/components/annotation/ProductPickerModal";
 import { FanEmojiMenu } from "./FanEmojiMenu";
@@ -63,7 +63,8 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
   );
 
   const createSub = useCreateSubProject(parentId ?? "");
-
+  const deleteSub = useDeleteSubProject(parentId ?? "");
+  const [deleteSubTarget, setDeleteSubTarget] = useState<{ id: string; name: string } | null>(null);
   const subprojects = parentDetail?.subprojects ?? [];
   const parentName = parentDetail?.name ?? "";
 
@@ -174,49 +175,61 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
             {subprojects.map((sub) => {
               const isCurrent = sub.id === projectId;
               return (
-                <button
+                <div
                   key={sub.id}
-                  onClick={() => {
-                    setOpen(false);
-                    if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`);
-                  }}
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 14px",
-                    background: isCurrent ? "#F5EDD8" : "transparent",
-                    border: "none",
+                    display: "flex", alignItems: "center",
                     borderBottom: "0.5px solid #F5F4F0",
-                    cursor: isCurrent ? "default" : "pointer",
-                    textAlign: "left",
-                    fontFamily: "inherit",
+                    background: isCurrent ? "#F5EDD8" : "transparent",
                   }}
                 >
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    background: isCurrent ? "#C49A3C" : "#F5F4F0",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 700,
-                    color: isCurrent ? "#fff" : "#888780",
-                    flexShrink: 0,
-                  }}>
-                    {sub.name[0]?.toUpperCase() ?? "S"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <button
+                    onClick={() => {
+                      setOpen(false);
+                      if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`);
+                    }}
+                    style={{
+                      flex: 1, display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 14px",
+                      background: "transparent", border: "none",
+                      cursor: isCurrent ? "default" : "pointer",
+                      textAlign: "left", fontFamily: "inherit",
+                    }}
+                  >
                     <div style={{
-                      fontSize: 13, fontWeight: isCurrent ? 600 : 400,
-                      color: isCurrent ? "#8B6520" : "#1A1A18",
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      width: 28, height: 28, borderRadius: 8,
+                      background: isCurrent ? "#C49A3C" : "#F5F4F0",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 12, fontWeight: 700,
+                      color: isCurrent ? "#fff" : "#888780",
+                      flexShrink: 0,
                     }}>
-                      {sub.name}
+                      {sub.name[0]?.toUpperCase() ?? "S"}
                     </div>
-                  </div>
-                  {isCurrent && (
-                    <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>
-                  )}
-                </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: isCurrent ? 600 : 400,
+                        color: isCurrent ? "#8B6520" : "#1A1A18",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>
+                        {sub.name}
+                      </div>
+                    </div>
+                    {isCurrent && <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteSubTarget({ id: sub.id, name: sub.name }); }}
+                    title="ลบโครงการย่อย"
+                    style={{
+                      width: 32, height: 32, flexShrink: 0, marginRight: 6,
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "#CCC4B8", fontSize: 14, borderRadius: 6,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    🗑
+                  </button>
+                </div>
               );
             })}
 
