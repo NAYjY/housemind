@@ -174,3 +174,36 @@ export function useProductDetail(productId: string | null) {
     staleTime: 3_300_000,
   });
 }
+
+/** DELETE /products/{productId} — delete own product */
+export function useDeleteProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId: string) => {
+      const res = await authFetch(`${API}/products/${productId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete product");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products", "my"] });
+    },
+  });
+}
+
+/** DELETE /products/link/{objectProductId} scoped to project — unlink from annotation */
+export function useUnlinkProductFromAnnotation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ objectProductId }: { objectProductId: string }) => {
+      const res = await authFetch(
+        `${API}/products/link/${objectProductId}?project_id=${projectId}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Failed to unlink product");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products", "project", projectId] });
+    },
+  });
+}

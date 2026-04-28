@@ -5,13 +5,15 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyProducts, useCreateProduct, useProductThumbnailUpload } from "@/hooks/useProducts";
-
+import { useMyProducts, useCreateProduct, useProductThumbnailUpload, useDeleteProduct } from "@/hooks/useProducts";
 export default function ProductsPage() {
   const auth = useAuth();
   const { data: products = [], isLoading } = useMyProducts();
   const createMutation = useCreateProduct();
   const uploadThumbnail = useProductThumbnailUpload();
+  const deleteMutation = useDeleteProduct();
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [deleteProductTarget, setDeleteProductTarget] = useState<{ id: string; name: string } | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -229,6 +231,49 @@ export default function ProductsPage() {
             No products yet — add your first one
           </div>
         )}
+        {deleteProductTarget && (
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 300,
+              background: "rgba(0,0,0,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <div style={{
+              background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
+              width: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}>
+              <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>🗑️</div>
+              <div style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 4 }}>ลบสินค้านี้?</div>
+              <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 20, lineHeight: 1.5 }}>
+                {deleteProductTarget.name}
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setDeleteProductTarget(null)}
+                  style={{ flex: 1, height: 40, borderRadius: 10, border: "0.5px solid #ddd", background: "#f5f5f5", fontSize: 13, cursor: "pointer" }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={async () => {
+                    setDeletingProductId(deleteProductTarget.id);
+                    try {
+                      await deleteMutation.mutateAsync(deleteProductTarget.id);
+                    } finally {
+                      setDeletingProductId(null);
+                      setDeleteProductTarget(null);
+                    }
+                  }}
+                  disabled={!!deletingProductId}
+                  style={{ flex: 1, height: 40, borderRadius: 10, border: "none", background: "#E24B4A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: deletingProductId ? 0.5 : 1 }}
+                >
+                  {deletingProductId ? "กำลังลบ…" : "ลบ"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {products.map((p) => {
           const expanded = expandedId === p.id;
           return (
@@ -237,8 +282,24 @@ export default function ProductsPage() {
               style={{
                 background: "#fff", border: "0.5px solid #E8E6E0",
                 borderRadius: 14, marginBottom: 10, overflow: "hidden",
+                position: "relative",
               }}
             >
+              {/* × delete button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setDeleteProductTarget({ id: p.id, name: p.name }); }}
+                style={{
+                  position: "absolute", top: 8, right: 8, zIndex: 5,
+                  width: 22, height: 22, borderRadius: "50%",
+                  background: "rgba(226,75,74,0.85)", border: "none",
+                  color: "#fff", fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center",
+                  justifyContent: "center",
+                }}
+                title="ลบสินค้า"
+              >
+                ×
+              </button>
               {/* Card row */}
               <div
                 style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 14px", cursor: "pointer" }}
