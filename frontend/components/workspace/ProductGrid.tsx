@@ -109,6 +109,9 @@ export function ProductGrid({
                           productId: p.id,
                           objectId: activeAnnotation.object_id,
                         });
+                      } catch (err) {
+                        console.error("Unlink failed:", err);
+                        alert("Failed to unlink product");
                       } finally {
                         setUnlinkingId(null);
                       }

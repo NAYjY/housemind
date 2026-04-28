@@ -198,8 +198,41 @@ async def soft_delete_annotation(
     ann = await get_active_annotation(session, annotation_id)
     if ann is None:
         return None
+
+    # Need project_id to clean up object_products
+    from app.models.object_product import ObjectProduct
+    img_stmt = select(ProjectImage).where(ProjectImage.id == ann.image_id)
+    img = (await session.execute(img_stmt)).scalar_one_or_none()
+    project_id = img.project_id if img else None
+    object_id = ann.object_id
+
     ann.soft_delete()
     await session.flush()
+
+    if project_id and object_id:
+        remaining_stmt = (
+            select(Annotation)
+            .join(ProjectImage, Annotation.image_id == ProjectImage.id)
+            .where(
+                ProjectImage.project_id == project_id,
+                ProjectImage.deleted_at.is_(None),
+                Annotation.deleted_at.is_(None),
+                Annotation.object_id == object_id,
+                Annotation.id != annotation_id,
+            )
+            .limit(1)
+        )
+        remaining = (await session.execute(remaining_stmt)).scalar_one_or_none()
+        if remaining is None:
+            op_stmt = select(ObjectProduct).where(
+                ObjectProduct.project_id == project_id,
+                ObjectProduct.object_id == object_id,
+            )
+            op_result = await session.execute(op_stmt)
+            for op in op_result.scalars().all():
+                await session.delete(op)
+            await session.flush()
+
     return ann
 
 
@@ -211,6 +244,36 @@ async def soft_delete_annotation_in_project(
     ann = await get_active_annotation_in_project(session, annotation_id, project_id)
     if ann is None:
         return None
+    object_id = ann.object_id
     ann.soft_delete()
     await session.flush()
+
+    # After soft-deleting, check if any OTHER active annotation in this project
+    # still uses the same object_id. If not, remove the object_products link.
+    if object_id:
+        from app.models.object_product import ObjectProduct
+        remaining_stmt = (
+            select(Annotation)
+            .join(ProjectImage, Annotation.image_id == ProjectImage.id)
+            .where(
+                ProjectImage.project_id == project_id,
+                ProjectImage.deleted_at.is_(None),
+                Annotation.deleted_at.is_(None),
+                Annotation.object_id == object_id,
+                Annotation.id != annotation_id,
+            )
+            .limit(1)
+        )
+        remaining = (await session.execute(remaining_stmt)).scalar_one_or_none()
+        if remaining is None:
+            # No other annotation uses this object_id — remove the product link
+            op_stmt = select(ObjectProduct).where(
+                ObjectProduct.project_id == project_id,
+                ObjectProduct.object_id == object_id,
+            )
+            op_result = await session.execute(op_stmt)
+            for op in op_result.scalars().all():
+                await session.delete(op)
+            await session.flush()
+
     return ann
