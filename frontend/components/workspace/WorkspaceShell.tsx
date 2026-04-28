@@ -111,6 +111,50 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
           padding: "2px 0",
         }}
       >
+        {deleteSubTarget && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 500,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
+            width: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>🗑️</div>
+            <div style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 4 }}>
+              ลบ "{deleteSubTarget.name}"?
+            </div>
+            <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 10, lineHeight: 1.5 }}>
+              รูปภาพและ annotation ทั้งหมดจะถูกลบด้วย
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button
+                onClick={() => setDeleteSubTarget(null)}
+                style={{ flex: 1, height: 40, borderRadius: 10, border: "0.5px solid #ddd", background: "#f5f5f5", fontSize: 13, cursor: "pointer" }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteSub.mutateAsync(deleteSubTarget.id);
+                  setDeleteSubTarget(null);
+                  setOpen(false);
+                  if (projectId === deleteSubTarget.id) {
+                    router.push("/th/profile");
+                  }
+                }}
+                disabled={deleteSub.isPending}
+                style={{ flex: 1, height: 40, borderRadius: 10, border: "none", background: "#E24B4A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: deleteSub.isPending ? 0.5 : 1 }}
+              >
+                {deleteSub.isPending ? "กำลังลบ…" : "ลบ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         <div>
           {!isShell && (
             <div style={{ fontSize: 10, color: "#888780", letterSpacing: "0.06em", textAlign: "left" }}>
@@ -135,7 +179,11 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
           {/* Backdrop */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 48 }}
-            onClick={() => { setOpen(false); setShowAddForm(false); }}
+            onClick={() => {
+              if (deleteSubTarget) return; // don't close while confirm is showing
+              setOpen(false);
+              setShowAddForm(false);
+            }}
           />
 
           <div style={{
@@ -556,7 +604,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           </div>
         </div>
       )}
-      
+
       {deleteTarget && (
         <DeleteConfirmPopup
           annotation={deleteTarget}
