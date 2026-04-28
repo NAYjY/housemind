@@ -422,36 +422,7 @@ async def unlink_product_by_product_id(
     await db.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-# ── DELETE /projects/{project_id} ─────────────────────────────────────────────
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_project(
-    project_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_architect),
-) -> Response:
-    """
-    Delete a subproject (and cascade its images + annotations via DB CASCADE).
-    Only the architect who owns it can delete it.
-    Only subprojects (parent_project_id IS NOT NULL) can be deleted this way.
-    """
-    from fastapi import Response as FastAPIResponse
-    result = await db.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.architect_id == uuid.UUID(user["user_id"]),
-            Project.parent_project_id.is_not(None),  # only subprojects
-        )
-    )
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subproject not found or you don't own it",
-        )
-    await db.delete(project)
-    await db.flush()
-    return FastAPIResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 # ── GET /products/scrape-images ───────────────────────────────────────────────
 
@@ -542,3 +513,31 @@ async def get_product(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return _presign_product(product)
+
+# ── DELETE /products/{product_id} ─────────────────────────────────────────────
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+) -> Response:
+    """
+    Delete a product. Only the supplier/architect who created it can delete.
+    Also removes all object_products links (CASCADE in DB handles annotations).
+    """
+    result = await db.execute(
+        select(Product).where(
+            Product.id == product_id,
+            Product.supplier_id == uuid.UUID(user["user_id"]),
+        )
+    )
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found or you don't own it",
+        )
+    await db.delete(product)
+    await db.flush()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
