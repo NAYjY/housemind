@@ -28,8 +28,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "007_security_hardening"
-down_revision: Union[str, None] = "006_object_products_object_id"
+revision: str = "008_security_hardening"
+down_revision: Union[str, None] = "007_object_products_object_id"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -9,8 +9,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "004_add_password_hash"
-down_revision: Union[str, None] = "003_add_parent_project_id"
+revision: str = "005_add_password_hash"
+down_revision: Union[str, None] = "004_add_parent_project_id"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
