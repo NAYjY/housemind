@@ -100,7 +100,8 @@ async def architect_token(db_session: AsyncSession) -> str:
     )
     db_session.add(user)
     await db_session.flush()
-    return _issue_token(user)
+    token, _jti, _exp = _issue_token(user)
+    return token
 
 
 @pytest_asyncio.fixture
