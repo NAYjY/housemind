@@ -66,59 +66,30 @@ export default function RedeemPage() {
   }, [params, router]);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--color-surface-muted)",
-      }}
-    >
-      <div
-        style={{
-          background: "var(--color-surface)",
-          borderRadius: 20,
-          padding: "40px 32px",
-          maxWidth: 360,
-          width: "100%",
-          textAlign: "center",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
-        }}
-      >
-        {state === "loading" && (
-          <>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                border: "3px solid var(--color-accent-light)",
-                borderTop: "3px solid var(--color-accent)",
-                animation: "hm-spin 0.7s linear infinite",
-                margin: "0 auto 20px",
-              }}
-            />
-            <p style={{ fontSize: 15, color: "var(--color-text-primary)", fontWeight: 500 }}>กำลังยืนยันตัวตน…</p>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 6 }}>Verifying your link</p>
-          </>
-        )}
-        {state === "success" && (
-          <>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
-            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-success)" }}>เข้าสู่ระบบสำเร็จ</p>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 6 }}>Redirecting…</p>
-          </>
-        )}
-        {state === "error" && (
-          <>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
-            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-error)" }}>ไม่สามารถเข้าสู่ระบบได้</p>
-            <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginTop: 8, lineHeight: 1.5 }}>{errorMsg}</p>
-          </>
-        )}
-        <style>{`@keyframes hm-spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    </main>
-  );
+  <main className="hm-auth-page">
+    <div className="hm-auth-card">
+      {state === "loading" && (
+        <>
+          <div className="hm-auth-spinner" />
+          <p className="hm-auth-status-text">กำลังยืนยันตัวตน…</p>
+          <p className="hm-auth-status-sub">Verifying your link</p>
+        </>
+      )}
+      {state === "success" && (
+        <>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-success)" }}>เข้าสู่ระบบสำเร็จ</p>
+          <p className="hm-auth-status-sub">Redirecting…</p>
+        </>
+      )}
+      {state === "error" && (
+        <>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-error)" }}>ไม่สามารถเข้าสู่ระบบได้</p>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginTop: 8, lineHeight: 1.5 }}>{errorMsg}</p>
+        </>
+      )}
+    </div>
+  </main>
+);
 }

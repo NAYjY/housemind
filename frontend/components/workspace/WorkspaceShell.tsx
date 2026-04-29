@@ -530,42 +530,25 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
       )}
 
       {deleteImageTarget && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: "rgba(0,0,0,0.4)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <div style={{
+        <div className="hm-del-overlay">
+          <div className="hm-imgdel-card" style={{
             background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
             width: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
           }}>
-            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>🖼️</div>
-            <div style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 4 }}>
-              ลบรูปภาพนี้?
-            </div>
-            <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 8, lineHeight: 1.5 }}>
-              {deleteImageTarget.label}
-            </div>
+            <div className="hm-del-icon">🖼️</div>
+            <div className="hm-del-title">ลบรูปภาพนี้?</div>
+            <div className="hm-del-meta">{deleteImageTarget.label}</div>
             {deleteImageTarget.annotationCount > 0 && (
-              <div style={{
-                fontSize: 12, color: "#C05A30",
-                background: "#FEF0E8", border: "0.5px solid #FAD9C8",
-                borderRadius: 8, padding: "8px 12px", marginBottom: 16,
-                textAlign: "center",
-              }}>
+              <div className="hm-imgdel-warn">
                 ⚠ จะลบ {deleteImageTarget.annotationCount} annotation ด้วย
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-              <button
-                onClick={() => setDeleteImageTarget(null)}
-                style={{ flex: 1, height: 40, borderRadius: 10, border: "0.5px solid #ddd", background: "#f5f5f5", fontSize: 13, cursor: "pointer" }}
-              >
+            <div className="hm-del-actions">
+              <button className="hm-del-cancel" onClick={() => setDeleteImageTarget(null)}>
                 ยกเลิก
               </button>
               <button
+                className="hm-del-confirm"
                 onClick={async () => {
                   await deleteImageMutation.mutateAsync(deleteImageTarget.id);
                   setDeleteImageTarget(null);
@@ -574,7 +557,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
                   resetSeed();
                 }}
                 disabled={deleteImageMutation.isPending}
-                style={{ flex: 1, height: 40, borderRadius: 10, border: "none", background: "#E24B4A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: deleteImageMutation.isPending ? 0.5 : 1 }}
+                style={{ opacity: deleteImageMutation.isPending ? 0.5 : 1 }}
               >
                 {deleteImageMutation.isPending ? "กำลังลบ…" : "ลบ"}
               </button>

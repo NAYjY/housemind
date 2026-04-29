@@ -1093,3 +1093,487 @@ button { font-family: inherit; }
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+/* ==========================================================================
+   9. Close button  (.hm-close-btn)
+   Used by: ProductDetailPanel.tsx
+   ========================================================================== */
+.hm-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #F5F4F0;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   10. Fan emoji menu  (.hm-fan-*)
+   Used by: FanEmojiMenu.tsx
+   ========================================================================== */
+.hm-fan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.hm-fan-root {
+  position: fixed;
+  z-index: 101;
+  transform: translate(-50%, -50%);
+}
+
+.hm-fan-btn {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #555;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 102;
+}
+
+.hm-fan-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #555;
+}
+
+/* ==========================================================================
+   11. Delete confirm popup  (.hm-del-*)
+   Used by: DeleteConfirmPopup.tsx
+   ========================================================================== */
+.hm-del-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hm-del-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 24px 20px;
+  width: 280px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.hm-del-icon {
+  font-size: 32px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.hm-del-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.hm-del-meta {
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.hm-del-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.hm-del-cancel {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  border: 0.5px solid #ddd;
+  background: #f5f5f5;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.hm-del-confirm {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: #E24B4A;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   12. Product picker modal  (.hm-picker-*)
+   Used by: ProductPickerModal.tsx
+   ========================================================================== */
+.hm-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.hm-picker-sheet {
+  background: #FAFAF8;
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 430px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: hm-slide-up 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.hm-picker-header {
+  padding: 16px 20px 12px;
+  border-bottom: 0.5px solid #E8E6E0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.hm-picker-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1A18;
+}
+
+.hm-picker-search-wrap {
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+.hm-picker-input {
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  border: 0.5px solid #E8E6E0;
+  padding: 0 14px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.hm-picker-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+
+.hm-picker-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: #bbb;
+  font-size: 13px;
+}
+
+.hm-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hm-picker-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  border: 0.5px solid #E8E6E0;
+  background: #fff;
+}
+
+.hm-picker-item.selected {
+  background: #F5EDD8;
+  border-color: #C49A3C;
+}
+
+.hm-picker-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: #F5F4F0;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hm-picker-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hm-picker-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1A1A18;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hm-picker-item-brand {
+  font-size: 11px;
+  color: #888;
+}
+
+.hm-picker-item-price {
+  font-size: 12px;
+  color: #8B6520;
+  font-weight: 600;
+}
+
+.hm-picker-footer {
+  padding: 12px 16px 24px;
+  border-top: 0.5px solid #E8E6E0;
+  flex-shrink: 0;
+}
+
+.hm-picker-confirm {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+
+.hm-picker-confirm.active {
+  background: #1A1A18;
+  color: #fff;
+  cursor: pointer;
+}
+
+.hm-picker-confirm.inactive {
+  background: #E8E6E0;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   13. Auth pages  (.hm-auth-*)
+   Used by: redeem/page.tsx, expired/page.tsx
+   ========================================================================== */
+.hm-auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-muted);
+  padding: 24px;
+}
+
+.hm-auth-card {
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 40px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+}
+
+.hm-auth-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--color-accent-light);
+  border-top-color: var(--color-accent);
+  animation: hm-spin 0.7s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes hm-spin {
+  to { transform: rotate(360deg); }
+}
+
+.hm-auth-status-text {
+  font-size: 15px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.hm-auth-status-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 6px;
+}
+
+.hm-auth-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-accent-light);
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hm-auth-heading {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.hm-auth-body {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.hm-auth-body small {
+  font-size: 12px;
+}
+
+.hm-auth-divider {
+  height: 0.5px;
+  background: var(--color-border);
+  margin: 24px 0;
+}
+
+.hm-auth-footer {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ==========================================================================
+   14. No-auth banner — override for signed-in link style
+   ========================================================================== */
+.hm-no-auth a {
+  color: #C9A84C;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   15. Workspace image delete confirm  (.hm-imgdel-*)
+   Used by: WorkspaceShell.tsx
+   ========================================================================== */
+.hm-imgdel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hm-imgdel-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 24px 20px;
+  width: 300px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.hm-imgdel-warn {
+  font-size: 12px;
+  color: #C05A30;
+  background: #FEF0E8;
+  border: 0.5px solid #FAD9C8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   16. Product grid header actions  (.hm-grid-*)
+   Used by: ProductGrid.tsx
+   ========================================================================== */
+.hm-grid-attach-btn {
+  font-size: 11px;
+  color: #fff;
+  background: #8B6520;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.hm-grid-toggle-btn {
+  font-size: 11px;
+  color: var(--color-accent, #8B6520);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.hm-grid-unlink-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(226, 75, 74, 0.9);
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.hm-grid-unlink-btn:disabled {
+  opacity: 0.5;
+}
+
+.hm-grid-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}

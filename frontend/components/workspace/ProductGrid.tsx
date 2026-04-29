@@ -52,24 +52,11 @@ export function ProductGrid({
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {canAttach && activeAnnotation && !showAll && (
-            <button
-              onClick={onAttachProduct}
-              style={{
-                fontSize: 11, color: "#fff", background: "#8B6520",
-                border: "none", borderRadius: 8, padding: "5px 10px",
-                cursor: "pointer", fontWeight: 500,
-              }}
-            >
+            <button onClick={onAttachProduct} className="hm-grid-attach-btn">
               + Attach
             </button>
           )}
-          <button
-            onClick={onShowAllToggle}
-            style={{
-              fontSize: 11, color: "var(--color-accent, #8B6520)",
-              background: "none", border: "none", cursor: "pointer",
-            }}
-          >
+          <button onClick={onShowAllToggle} className="hm-grid-toggle-btn">
             {showAll ? "Filter by pin" : "Show all"}
           </button>
         </div>
@@ -82,7 +69,7 @@ export function ProductGrid({
       )}
 
       {!isLoading && products.length === 0 && (
-        <div style={{ padding: "40px 20px", textAlign: "center", color: "#888", fontSize: 13 }}>
+        <div className="hm-grid-empty">
           {activeAnnotation && !showAll
             ? "No products for this pin yet — tap Attach"
             : "No products in this project yet"}
@@ -117,15 +104,7 @@ export function ProductGrid({
                       }
                     }}
                   disabled={unlinkingId === p.id}
-                  style={{
-                    position: "absolute", top: 6, right: 6, zIndex: 10,
-                    width: 20, height: 20, borderRadius: "50%",
-                    background: "rgba(226,75,74,0.9)", border: "none",
-                    color: "#fff", fontSize: 11, fontWeight: 700,
-                    cursor: "pointer", display: "flex", alignItems: "center",
-                    justifyContent: "center", lineHeight: 1,
-                    opacity: unlinkingId === p.id ? 0.5 : 1,
-                  }}
+                  className="hm-grid-unlink-btn"
                   title="Remove from project"
                 >
                   ×
