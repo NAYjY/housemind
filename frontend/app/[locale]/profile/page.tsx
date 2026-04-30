@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, useCreateProject, type ProjectListItem, type ProjectDetail } from "@/hooks/useProjects";
-import { clearToken, authFetch } from "@/lib/auth";
+import { logout, authFetch } from "@/lib/auth";
 import { InviteModal } from "@/components/project/InviteModal";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -165,8 +165,8 @@ export default function ProfilePage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [inviteProject, setInviteProject] = useState<ProjectListItem | null>(null);
 
-  function handleSignOut() {
-    clearToken();
+  async function handleSignOut() {
+    await logout(); 
     router.push("/login");
   }
 
