@@ -32,3 +32,14 @@ export function getQueryClient(): QueryClient {
   if (!browserClient) browserClient = makeQueryClient();
   return browserClient;
 }
+
+/**
+ * Server-only: returns a fresh QueryClient per request.
+ * Use this in Server Components that prefetch data, then pass
+ * dehydrate(client) into HydrationBoundary.
+ *
+ * Do NOT call this on the client — use getQueryClient() instead.
+ */
+export function getServerQueryClient(): QueryClient {
+  return makeQueryClient();
+}
