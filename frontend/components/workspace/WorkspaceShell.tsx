@@ -1,7 +1,7 @@
 // components/workspace/WorkspaceShell.tsx
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,17 +12,18 @@ import {
 } from "@/hooks/useAnnotations";
 import { useAnnotationStore, type Annotation } from "@/store/annotationStore";
 import { useAuth } from "@/hooks/useAuth";
-import { useProjectImages, useDeleteProjectImage } from "@/hooks/useProjectImages";
+import { useProjectImages } from "@/hooks/useProjectImages";
 import { useLinkProduct, type ProductDetail } from "@/hooks/useProducts";
-import { useProjectDetail, useCreateSubProject, useDeleteSubProject } from "@/hooks/useProjects";
+import { useProjectDetail, useCreateSubProject } from "@/hooks/useProjects";
 import { ProductDetailPanel } from "@/components/annotation/ProductDetailPanel";
 import { ProductPickerModal } from "@/components/annotation/ProductPickerModal";
 import { FanEmojiMenu } from "./FanEmojiMenu";
 import { DeleteConfirmPopup } from "./DeleteConfirmPopup";
-import { PinsLayer } from "./PinsLayer";
 import { ProductGrid } from "./ProductGrid";
+import { WorkspaceCanvas } from "./WorkspaceCanvas";
 import { useSlides } from "@/hooks/useSlides";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { authFetch } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -37,7 +38,7 @@ interface Props {
 
 interface SubprojectNavProps {
   projectId: string;
-  isShell: boolean; // true = this IS the main project (shell mode)
+  isShell: boolean;
 }
 
 function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
@@ -48,17 +49,22 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
-  const [deleteSubTarget, setDeleteSubTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: currentProject } = useProjectDetail(projectId);
-  const parentId = isShell ? projectId : (currentProject?.parent_project_id ?? null);
-  const { data: parentDetail, refetch: refetchParent } = useProjectDetail(parentId ?? "");
-  const createSub = useCreateSubProject(parentId ?? "");
-  const deleteSub = useDeleteSubProject(parentId ?? "");
+  const parentId = isShell
+    ? projectId
+    : (currentProject?.parent_project_id ?? null);
 
+  const { data: parentDetail, refetch: refetchParent } = useProjectDetail(
+    parentId ?? ""
+  );
+
+  const createSub = useCreateSubProject(parentId ?? "");
   const subprojects = parentDetail?.subprojects ?? [];
   const parentName = parentDetail?.name ?? "";
-  const currentLabel = isShell ? (parentDetail?.name ?? "…") : (currentProject?.name ?? "…");
+  const currentLabel = isShell
+    ? (parentDetail?.name ?? "…")
+    : (currentProject?.name ?? "…");
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -85,59 +91,16 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
 
   return (
     <div style={{ position: "relative" }}>
-
-      {/* Delete confirm — fixed overlay, outside button and dropdown */}
-      {deleteSubTarget && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 500,
-            background: "rgba(0,0,0,0.4)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <div style={{
-            background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
-            width: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-          }}>
-            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>🗑️</div>
-            <div style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 4 }}>
-              ลบ "{deleteSubTarget.name}"?
-            </div>
-            <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 10, lineHeight: 1.5 }}>
-              รูปภาพและ annotation ทั้งหมดจะถูกลบด้วย
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-              <button
-                onClick={() => setDeleteSubTarget(null)}
-                style={{ flex: 1, height: 40, borderRadius: 10, border: "0.5px solid #ddd", background: "#f5f5f5", fontSize: 13, cursor: "pointer" }}
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={async () => {
-                  await deleteSub.mutateAsync(deleteSubTarget.id);
-                  setDeleteSubTarget(null);
-                  setOpen(false);
-                  if (projectId === deleteSubTarget.id) {
-                    router.push("/th/profile");
-                  }
-                }}
-                disabled={deleteSub.isPending}
-                style={{ flex: 1, height: 40, borderRadius: 10, border: "none", background: "#E24B4A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: deleteSub.isPending ? 0.5 : 1 }}
-              >
-                {deleteSub.isPending ? "กำลังลบ…" : "ลบ"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Trigger button */}
       <button
         onClick={() => { setOpen((v) => !v); setShowAddForm(false); }}
         style={{
-          display: "flex", alignItems: "center", gap: 6,
-          background: "none", border: "none", cursor: "pointer", padding: "2px 0",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "2px 0",
         }}
       >
         <div>
@@ -158,28 +121,33 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
         </div>
       </button>
 
-      {/* Dropdown */}
       {open && (
         <>
           <div
             style={{ position: "fixed", inset: 0, zIndex: 48 }}
-            onClick={() => {
-              if (deleteSubTarget) return;
-              setOpen(false);
-              setShowAddForm(false);
-            }}
+            onClick={() => { setOpen(false); setShowAddForm(false); }}
           />
-
           <div style={{
-            position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 49,
-            background: "#fff", border: "0.5px solid #E8E6E0", borderRadius: 14,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)", minWidth: 220, maxWidth: 280,
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            left: 0,
+            zIndex: 49,
+            background: "#fff",
+            border: "0.5px solid #E8E6E0",
+            borderRadius: 14,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+            minWidth: 220,
+            maxWidth: 280,
             overflow: "hidden",
           }}>
             <div style={{
-              padding: "10px 14px 6px", fontSize: 10, fontWeight: 700,
-              letterSpacing: "0.1em", textTransform: "uppercase",
-              color: "#B0A090", borderBottom: "0.5px solid #F5F4F0",
+              padding: "10px 14px 6px",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "#B0A090",
+              borderBottom: "0.5px solid #F5F4F0",
             }}>
               {parentName} · โครงการย่อย
             </div>
@@ -193,59 +161,49 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
             {subprojects.map((sub) => {
               const isCurrent = sub.id === projectId;
               return (
-                <div
+                <button
                   key={sub.id}
+                  onClick={() => {
+                    setOpen(false);
+                    if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`);
+                  }}
                   style={{
-                    display: "flex", alignItems: "center",
-                    borderBottom: "0.5px solid #F5F4F0",
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
                     background: isCurrent ? "#F5EDD8" : "transparent",
+                    border: "none",
+                    borderBottom: "0.5px solid #F5F4F0",
+                    cursor: isCurrent ? "default" : "pointer",
+                    textAlign: "left",
+                    fontFamily: "inherit",
                   }}
                 >
-                  <button
-                    onClick={() => {
-                      setOpen(false);
-                      if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`);
-                    }}
-                    style={{
-                      flex: 1, display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 14px", background: "transparent", border: "none",
-                      cursor: isCurrent ? "default" : "pointer",
-                      textAlign: "left", fontFamily: "inherit",
-                    }}
-                  >
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: isCurrent ? "#C49A3C" : "#F5F4F0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 700,
+                    color: isCurrent ? "#fff" : "#888780",
+                    flexShrink: 0,
+                  }}>
+                    {sub.name[0]?.toUpperCase() ?? "S"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      width: 28, height: 28, borderRadius: 8,
-                      background: isCurrent ? "#C49A3C" : "#F5F4F0",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 12, fontWeight: 700,
-                      color: isCurrent ? "#fff" : "#888780", flexShrink: 0,
+                      fontSize: 13, fontWeight: isCurrent ? 600 : 400,
+                      color: isCurrent ? "#8B6520" : "#1A1A18",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     }}>
-                      {sub.name[0]?.toUpperCase() ?? "S"}
+                      {sub.name}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 13, fontWeight: isCurrent ? 600 : 400,
-                        color: isCurrent ? "#8B6520" : "#1A1A18",
-                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                      }}>
-                        {sub.name}
-                      </div>
-                    </div>
-                    {isCurrent && <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>}
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeleteSubTarget({ id: sub.id, name: sub.name }); }}
-                    title="ลบโครงการย่อย"
-                    style={{
-                      width: 32, height: 32, flexShrink: 0, marginRight: 6,
-                      background: "none", border: "none", cursor: "pointer",
-                      color: "#CCC4B8", fontSize: 14, borderRadius: 6,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
-                    🗑
-                  </button>
-                </div>
+                  </div>
+                  {isCurrent && (
+                    <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>
+                  )}
+                </button>
               );
             })}
 
@@ -253,10 +211,19 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
               <button
                 onClick={() => setShowAddForm(true)}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 8,
-                  padding: "10px 14px", background: "transparent", border: "none",
-                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                  color: "#8B6520", fontSize: 13, fontWeight: 500,
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 14px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                  color: "#8B6520",
+                  fontSize: 13,
+                  fontWeight: 500,
                 }}
               >
                 <span style={{
@@ -278,9 +245,12 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="เช่น ห้องนอน, ห้องน้ำ"
                   style={{
-                    width: "100%", height: 36, border: "0.5px solid #E8E6E0", borderRadius: 8,
-                    padding: "0 10px", fontSize: 12, fontFamily: "inherit", outline: "none",
-                    background: "#fff", color: "#1A1A18", boxSizing: "border-box", marginBottom: 6,
+                    width: "100%", height: 36,
+                    border: "0.5px solid #E8E6E0", borderRadius: 8,
+                    padding: "0 10px", fontSize: 12,
+                    fontFamily: "inherit", outline: "none",
+                    background: "#fff", color: "#1A1A18",
+                    boxSizing: "border-box", marginBottom: 6,
                   }}
                 />
                 <input
@@ -288,12 +258,17 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="รายละเอียด (optional)"
                   style={{
-                    width: "100%", height: 36, border: "0.5px solid #E8E6E0", borderRadius: 8,
-                    padding: "0 10px", fontSize: 12, fontFamily: "inherit", outline: "none",
-                    background: "#fff", color: "#1A1A18", boxSizing: "border-box", marginBottom: 8,
+                    width: "100%", height: 36,
+                    border: "0.5px solid #E8E6E0", borderRadius: 8,
+                    padding: "0 10px", fontSize: 12,
+                    fontFamily: "inherit", outline: "none",
+                    background: "#fff", color: "#1A1A18",
+                    boxSizing: "border-box", marginBottom: 8,
                   }}
                 />
-                {formError && <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{formError}</div>}
+                {formError && (
+                  <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{formError}</div>
+                )}
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
@@ -325,7 +300,8 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
     </div>
   );
 }
-// ── Shell view (main project with no canvas) ──────────────────────────────────
+
+// ── Shell view ────────────────────────────────────────────────────────────────
 
 function ShellView({ projectId }: { projectId: string }) {
   return (
@@ -370,43 +346,12 @@ function ShellView({ projectId }: { projectId: string }) {
   );
 }
 
-interface FilmThumbProps {
-  slide: { imageId: string; url: string; label: string };
-  index: number;
-  isActive: boolean;
-  canDelete: boolean;
-  onSelect: () => void;
-  onLongPress: () => void;
-}
-
-function FilmThumb({ slide, index, isActive, canDelete, onSelect, onLongPress }: FilmThumbProps) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  return (
-    <div
-      className={`hm-film-thumb ${isActive ? "active" : ""}`}
-      onClick={onSelect}
-      onPointerDown={() => {
-        if (!canDelete) return;
-        timerRef.current = setTimeout(onLongPress, 600);
-      }}
-      onPointerUp={() => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } }}
-      onPointerLeave={() => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } }}
-    >
-      {slide.url && <img src={slide.url} alt={slide.label} />}
-      <span style={{ position: "relative", zIndex: 1 }}>{index + 1}</span>
-    </div>
-  );
-}
-
 // ── Main WorkspaceShell ───────────────────────────────────────────────────────
 
 export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: Props) {
   const auth = useAuth();
-  const qc = useQueryClient();
   const readOnly = forceReadOnly || auth.isReadOnly;
 
-  // Detect if this projectId is a main project (shell) or a subproject
   const { data: currentProject } = useProjectDetail(projectId);
   const isShell = currentProject
     ? currentProject.parent_project_id === null
@@ -414,16 +359,22 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
   // ── Slides ────────────────────────────────────────────────────────────────
   const { data: dbImages, refetch: refetchImages } = useProjectImages(projectId);
-  const { slides, currentSlide, activeSlide, setCurrentSlide, resetSeed, addLocalSlide, prev, next } =
-    useSlides({ initialImageId: imageId, initialImageUrl: imageUrl, dbImages });
+  const {
+    slides,
+    currentSlide,
+    activeSlide,
+    setCurrentSlide,
+    resetSeed,
+    addLocalSlide,
+    prev,
+    next,
+  } = useSlides({ initialImageId: imageId, initialImageUrl: imageUrl, dbImages });
 
   const handleUploadSuccess = useCallback(async () => {
     await refetchImages();
     resetSeed();
-    
   }, [resetSeed, refetchImages]);
 
-  const deleteImageMutation = useDeleteProjectImage(projectId);
   const { uploading, uploadError, uploadFile, submitUrl } = useImageUpload({
     projectId,
     isAuthenticated: auth.isAuthenticated,
@@ -437,7 +388,6 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
   const [fanPos, setFanPos] = useState({ x: 0, y: 0 });
   const [pendingPos, setPendingPos] = useState({ normX: 0, normY: 0 });
   const [deleteTarget, setDeleteTarget] = useState<Annotation | null>(null);
-  const [deleteImageTarget, setDeleteImageTarget] = useState<{ id: string; label: string; annotationCount: number } | null>(null);
   const [activePinId, setActivePinId] = useState<string | null>(null);
   const [activeProduct, setActiveProduct] = useState<ProductDetail | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -445,7 +395,9 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
   // ── Annotations ───────────────────────────────────────────────────────────
   useAnnotations(activeSlide.imageId);
-  const annotations = useAnnotationStore((s) => s.annotationsByImage[activeSlide.imageId] ?? []);
+  const annotations = useAnnotationStore(
+    (s) => s.annotationsByImage[activeSlide.imageId] ?? []
+  );
   const createMutation = useCreateAnnotation(activeSlide.imageId, projectId);
   const deleteMutation = useDeleteAnnotation(activeSlide.imageId);
   const linkProduct = useLinkProduct(projectId);
@@ -455,49 +407,16 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     ? annotations.find((a) => a.id === activePinId) ?? null
     : null;
 
-  // ── Canvas long-press to open fan menu ────────────────────────────────────
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const canvasLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const canvasTouchStart = useRef<{ x: number; y: number } | null>(null);
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const toNorm = useCallback((clientX: number, clientY: number) => {
-    const el = canvasRef.current;
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    return {
-      normX: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
-      normY: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
-    };
-  }, []);
-
-  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (readOnly || !auth.isAuthenticated) return;
-    canvasTouchStart.current = { x: e.clientX, y: e.clientY };
-    canvasLongPressTimer.current = setTimeout(() => {
-      const norm = toNorm(e.clientX, e.clientY);
-      if (!norm) return;
-      setPendingPos(norm);
-      setFanPos({ x: e.clientX, y: e.clientY });
+  const handleLongPress = useCallback(
+    (normX: number, normY: number, clientX: number, clientY: number) => {
+      setPendingPos({ normX, normY });
+      setFanPos({ x: clientX, y: clientY });
       setFanVisible(true);
-    }, 600);
-  };
-
-  const handleCanvasPointerUp = () => {
-    if (canvasLongPressTimer.current) {
-      clearTimeout(canvasLongPressTimer.current);
-      canvasLongPressTimer.current = null;
-    }
-  };
-
-  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const start = canvasTouchStart.current;
-    if (!start) return;
-    const moved = Math.abs(e.clientX - start.x) > 8 || Math.abs(e.clientY - start.y) > 8;
-    if (moved && canvasLongPressTimer.current) {
-      clearTimeout(canvasLongPressTimer.current);
-      canvasLongPressTimer.current = null;
-    }
-  };
+    },
+    []
+  );
 
   const handleEmojiPick = async (objectId: number) => {
     setFanVisible(false);
@@ -510,14 +429,50 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
     setShowAll(false);
   };
 
-  const handleSlideChange = (idx: number) => {
-    setCurrentSlide(idx);
+  const handlePinTap = useCallback((id: string) => {
+    setActivePinId((prev) => (prev === id ? null : id));
+    setShowAll(false);
+    setActiveProduct(null);
+  }, []);
+
+  const handleSlideChange = useCallback(
+    (idx: number) => {
+      setCurrentSlide(idx);
+      setActivePinId(null);
+      setActiveProduct(null);
+      setFilmExpanded(false);
+    },
+    [setCurrentSlide]
+  );
+
+  const handleFilmToggle = useCallback(() => {
+    setFilmExpanded((v) => !v);
+  }, []);
+
+  const handleUrlSubmit = useCallback(
+    (url: string) => {
+      submitUrl(url, (localUrl) => {
+        addLocalSlide(localUrl);
+        setRefInput("");
+        setFilmExpanded(false);
+      });
+    },
+    [submitUrl, addLocalSlide]
+  );
+
+  const handleSlidePrev = useCallback(() => {
+    prev();
     setActivePinId(null);
     setActiveProduct(null);
-    setFilmExpanded(false);
-  };
+  }, [prev]);
 
-  // ── Shell mode: no canvas ─────────────────────────────────────────────────
+  const handleSlideNext = useCallback(() => {
+    next();
+    setActivePinId(null);
+    setActiveProduct(null);
+  }, [next]);
+
+  // ── Shell mode ────────────────────────────────────────────────────────────
   if (isShell) {
     return <ShellView projectId={projectId} />;
   }
@@ -526,44 +481,11 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
   return (
     <>
       {fanVisible && (
-        <FanEmojiMenu pos={fanPos} onPick={handleEmojiPick} onClose={() => setFanVisible(false)} />
-      )}
-
-      {deleteImageTarget && (
-        <div className="hm-del-overlay">
-          <div className="hm-imgdel-card" style={{
-            background: "#fff", borderRadius: 16, padding: "24px 24px 20px",
-            width: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-          }}>
-            <div className="hm-del-icon">🖼️</div>
-            <div className="hm-del-title">ลบรูปภาพนี้?</div>
-            <div className="hm-del-meta">{deleteImageTarget.label}</div>
-            {deleteImageTarget.annotationCount > 0 && (
-              <div className="hm-imgdel-warn">
-                ⚠ จะลบ {deleteImageTarget.annotationCount} annotation ด้วย
-              </div>
-            )}
-            <div className="hm-del-actions">
-              <button className="hm-del-cancel" onClick={() => setDeleteImageTarget(null)}>
-                ยกเลิก
-              </button>
-              <button
-                className="hm-del-confirm"
-                onClick={async () => {
-                  await deleteImageMutation.mutateAsync(deleteImageTarget.id);
-                  setDeleteImageTarget(null);
-                  if (activeSlide.imageId === deleteImageTarget.id) handleSlideChange(0);
-                  await refetchImages();
-                  resetSeed();
-                }}
-                disabled={deleteImageMutation.isPending}
-                style={{ opacity: deleteImageMutation.isPending ? 0.5 : 1 }}
-              >
-                {deleteImageMutation.isPending ? "กำลังลบ…" : "ลบ"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <FanEmojiMenu
+          pos={fanPos}
+          onPick={handleEmojiPick}
+          onClose={() => setFanVisible(false)}
+        />
       )}
 
       {deleteTarget && (
@@ -620,163 +542,40 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
           </a>
         </div>
 
-        {/* Nav with subproject dropdown */}
         <div className="hm-proj-nav">
           <SubprojectNav projectId={projectId} isShell={false} />
         </div>
 
-        {/* Canvas */}
-        <div className="hm-canvas-wrap">
-          {activeSlide.url && (
-        <img
-          className="hm-canvas-img"
-          src={activeSlide.url}
-          alt={activeSlide.label}
-          onError={() => {
-            if (projectId !== "demo") {
-              refetchImages();
-            }
+        <WorkspaceCanvas
+          activeSlide={activeSlide}
+          slides={slides}
+          currentSlide={currentSlide}
+          annotations={annotations}
+          activePinId={activePinId}
+          readOnly={readOnly}
+          isAuthenticated={auth.isAuthenticated}
+          canAnnotate={!readOnly}
+          isCreating={createMutation.isPending}
+          filmExpanded={filmExpanded}
+          uploading={uploading}
+          uploadError={uploadError}
+          refInput={refInput}
+          showMultipleSlides={slides.length > 1}
+          onLongPress={handleLongPress}
+          onPinTap={handlePinTap}
+          onPinLongPress={(ann) => setDeleteTarget(ann)}
+          onPinMove={(id, normX, normY) => moveMutation.mutate({ id, normX, normY })}
+          onSlideChange={handleSlideChange}
+          onSlidePrev={handleSlidePrev}
+          onSlideNext={handleSlideNext}
+          onFilmToggle={handleFilmToggle}
+          onRefInputChange={setRefInput}
+          onUrlSubmit={handleUrlSubmit}
+          onFileUpload={uploadFile}
+          onImageError={() => {
+            if (projectId !== "demo") refetchImages();
           }}
-        />          
-        )}
-
-          <div
-            ref={canvasRef}
-            className="hm-canvas-tap"
-            onPointerDown={handleCanvasPointerDown}
-            onPointerUp={handleCanvasPointerUp}
-            onPointerMove={handleCanvasPointerMove}
-            onPointerLeave={handleCanvasPointerUp}
-          />
-
-          {annotations.length === 0 && !readOnly && (
-            <div className="hm-canvas-hint">
-              {auth.isAuthenticated ? "Hold to annotate" : "Sign in to annotate"}
-            </div>
-          )}
-
-          <PinsLayer
-            annotations={annotations}
-            activeId={activePinId}
-            onSingleTap={(id) => {
-              setActivePinId((prev) => (prev === id ? null : id));
-              setShowAll(false);
-              setActiveProduct(null);
-            }}
-            onLongPress={(ann) => setDeleteTarget(ann)}
-            onMove={(id, normX, normY) => moveMutation.mutate({ id, normX, normY })}
-          />
-
-          {createMutation.isPending && (
-            <div className="hm-creating">
-              <div className="spinner" />
-            </div>
-          )}
-
-          {slides.length > 1 && (
-            <div className="hm-carousel-nav">
-              <button className="hm-c-btn" onClick={() => { prev(); setActivePinId(null); setActiveProduct(null); }}>
-                ‹
-              </button>
-              <button className="hm-c-btn" onClick={() => { next(); setActivePinId(null); setActiveProduct(null); }}>
-                ›
-              </button>
-            </div>
-          )}
-
-          {/* Filmstrip */}
-          <div className={`hm-filmstrip ${filmExpanded ? "expanded" : "collapsed"}`}>
-            <div
-              className="hm-tray-row"
-              onWheel={(e) => {
-                e.preventDefault();
-                e.currentTarget.scrollLeft += e.deltaY;
-              }}
-            >
-              {slides.map((s, i) => (
-                <FilmThumb
-                  key={s.imageId}
-                  slide={s}
-                  index={i}
-                  isActive={i === currentSlide}
-                  canDelete={auth.canWrite && !s.imageId.startsWith("local-")}
-                  onSelect={() => handleSlideChange(i)}
-                  onLongPress={() => {
-                    const annCount = (useAnnotationStore.getState().annotationsByImage[s.imageId] ?? []).length;
-                    setDeleteImageTarget({ id: s.imageId, label: s.label, annotationCount: annCount });
-                  }}
-                />
-              ))}
-              <button className="hm-film-add" onClick={() => setFilmExpanded((v) => !v)}>
-                <span className="hm-film-add-icon">+</span>
-                <span className="hm-film-add-label">Add</span>
-              </button>
-            </div>
-
-            {filmExpanded && (
-              <div className="hm-tray-upload-row">
-                <div className="hm-tray-input-row">
-                  <label
-                    className="hm-tray-file-btn"
-                    style={{ opacity: uploading || !auth.isAuthenticated ? 0.5 : 1 }}
-                  >
-                    📁 {uploading ? "Uploading…" : "Upload image"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) uploadFile(f);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  <div style={{ flex: 1 }} />
-                  <button
-                    className="hm-tray-close"
-                    onClick={() => {
-                      setFilmExpanded(false);
-                      setRefInput("");
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="hm-tray-input-row">
-                  <input
-                    className="hm-tray-input"
-                    placeholder="Or paste image URL…"
-                    value={refInput}
-                    onChange={(e) => setRefInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        submitUrl(refInput, (url) => {
-                          addLocalSlide(url);
-                          setRefInput("");
-                          setFilmExpanded(false);
-                        });
-                      }
-                    }}
-                  />
-                  <button
-                    className="hm-tray-submit"
-                    onClick={() =>
-                      submitUrl(refInput, (url) => {
-                        addLocalSlide(url);
-                        setRefInput("");
-                        setFilmExpanded(false);
-                      })
-                    }
-                  >
-                    Add
-                  </button>
-                </div>
-                {uploadError && <div className="hm-upload-error">⚠ {uploadError}</div>}
-              </div>
-            )}
-          </div>
-        </div>
+        />
 
         <ProductGrid
           projectId={projectId}
