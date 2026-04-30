@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, require_architect
@@ -173,7 +173,14 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
         )
-
+    # Option 3 lazy cleanup: prune caller's expired rows on successful login
+    await db.execute(
+        delete(RevokedToken).where(
+            RevokedToken.user_id == user.id,
+            RevokedToken.expires_at < datetime.now(timezone.utc),
+        )
+    )
+    
     resp_body, token = _build_token_response(user)
     _set_auth_cookie(response, token)
     return resp_body
