@@ -34,6 +34,7 @@ import re
 import uuid
 from pathlib import PurePosixPath
 from urllib.parse import urljoin
+import asyncio
 
 import httpx
 from bs4 import BeautifulSoup
@@ -58,8 +59,8 @@ from app.schemas.product import (
 )
 from app.services.s3 import (
     make_product_thumbnail_key,
-    presign_product_thumbnail,
-    presign_product_thumbnail_upload,
+    presign_product_thumbnail_async,
+    presign_product_thumbnail_upload_async,
 )
 from app.services.ssrf_guard import validate_url_against_ssrf  # SEC-02
 
@@ -94,11 +95,11 @@ def _can_create_product(user: dict) -> bool:
     return user["role"] in {"architect", "supplier"}
 
 
-def _presign_product(p: Product) -> ProductDetail:
+async def _presign_product(p: Product) -> ProductDetail:
     try:
-        url = presign_product_thumbnail(p.thumbnail_s3_key)
+        url = await presign_product_thumbnail_async(p.thumbnail_s3_key)
     except RuntimeError:
-        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key)  # SEC-08
+        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key)
         url = ""
     return ProductDetail(
         id=p.id,
@@ -183,7 +184,7 @@ async def search_products(
     products = result.scalars().all()
 
     return ProductSearchResponse(
-        items=[_presign_product(p) for p in products],
+        items=list(await asyncio.gather(*[_presign_product(p) for p in products])),
         total=total,
     )
 
@@ -228,7 +229,7 @@ async def search_catalogue(
     products = result.scalars().all()
 
     return ProductSearchResponse(
-        items=[_presign_product(p) for p in products],
+        items=list(await asyncio.gather(*[_presign_product(p) for p in products])),
         total=total,
     )
     
@@ -247,7 +248,7 @@ async def my_products(
         .order_by(Product.created_at.desc())
         .limit(500)  # SEC-14: hard cap even on "my products"
     )
-    return [_presign_product(p) for p in result.scalars().all()]
+    return [await _presign_product(p) for p in result.scalars().all()]
 
 
 # ── POST /products/thumbnail-url ──────────────────────────────────────────────
@@ -264,7 +265,7 @@ async def get_thumbnail_upload_url(
     product_id = uuid.uuid4()
     s3_key = make_product_thumbnail_key(str(product_id), ext)
     try:
-        upload_url = presign_product_thumbnail_upload(s3_key, body.content_type)
+        upload_url = await presign_product_thumbnail_upload_async(s3_key, body.content_type)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     return ProductPresignResponse(upload_url=upload_url, s3_key=s3_key, expires_in=900)
@@ -299,7 +300,7 @@ async def create_product(
     )
     db.add(product)
     await db.flush()
-    return _presign_product(product)
+    return await _presign_product(product)
 
 
 # ── GET /products?project_id= ─────────────────────────────────────────────────
@@ -322,7 +323,7 @@ async def list_project_products(
         stmt = stmt.where(ObjectProduct.object_id == object_id)
     stmt = stmt.order_by(ObjectProduct.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(stmt)
-    return [_presign_product(p) for p in result.scalars().all()]
+    return [await _presign_product(p) for p in result.scalars().all()]
 
 
 # ── POST /products/link ────────────────────────────────────────────────────────
@@ -365,7 +366,7 @@ async def link_product_to_project(
         object_id=op.object_id,
         product_id=op.product_id,
         created_at=op.created_at,
-        product=_presign_product(prod) if prod else None,
+        product=await _presign_product(prod) if prod else None,
     )
 
 

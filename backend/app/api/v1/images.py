@@ -34,8 +34,8 @@ from app.schemas.image import (
 )
 from app.services.s3 import (
     make_project_image_key,
-    presign_project_image,
-    presign_project_image_upload,
+    presign_project_image_async,
+    presign_project_image_upload_async,
 )
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -56,7 +56,7 @@ async def list_project_images(
     result = []
     for image in images:
         try:
-            url = presign_project_image(image.s3_key)
+            url = await presign_project_image_async(image.s3_key)
         except RuntimeError:
             url = ""
         result.append(
@@ -89,7 +89,7 @@ async def refresh_image_url(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     try:
-        url = presign_project_image(image.s3_key)
+        url = await presign_project_image_async(image.s3_key)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
@@ -148,7 +148,7 @@ async def get_upload_url(
     s3_key = make_project_image_key(str(body.project_id), str(image_id), ext)
 
     try:
-        upload_url = presign_project_image_upload(s3_key, body.content_type)
+        upload_url = await presign_project_image_upload_async(s3_key, body.content_type)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 

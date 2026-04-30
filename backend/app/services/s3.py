@@ -8,9 +8,12 @@ In staging/production, real S3 is used.
 """
 from __future__ import annotations
 
+import asyncio
 import os as _os
 import re
 import shutil
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 
 import boto3
@@ -152,3 +155,36 @@ def make_project_image_key(project_id: str, image_id: str, extension: str) -> st
 def make_product_thumbnail_key(product_id: str, extension: str) -> str:
     safe_ext = _sanitize_extension(extension)
     return f"{PREFIX_PRODUCT_THUMBNAILS}{product_id}.{safe_ext}"
+
+# ── Thread pool for blocking boto3 calls ─────────────────────────────────────
+# boto3 is synchronous. Running it directly on the async event loop blocks all
+# other coroutines. A dedicated executor keeps the loop free.
+_s3_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="s3-presign")
+
+
+async def presign_product_thumbnail_async(s3_key: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        _s3_executor, partial(presign_product_thumbnail, s3_key)
+    )
+
+
+async def presign_project_image_async(s3_key: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        _s3_executor, partial(presign_project_image, s3_key)
+    )
+
+
+async def presign_product_thumbnail_upload_async(s3_key: str, content_type: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        _s3_executor, partial(presign_product_thumbnail_upload, s3_key, content_type)
+    )
+
+
+async def presign_project_image_upload_async(s3_key: str, content_type: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        _s3_executor, partial(presign_project_image_upload, s3_key, content_type)
+    )
