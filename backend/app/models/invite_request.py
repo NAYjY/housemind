@@ -1,6 +1,7 @@
 """
 app/models/invite_request.py — HouseMind
-Magic-link invite tokens for project onboarding.
+Invite records — status tracking only (magic_link_token dropped in migration 004).
+The active invite flow uses POST /invites → project_members directly.
 """
 from __future__ import annotations
 
@@ -8,13 +9,13 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import UUID, DateTime, Enum, ForeignKey, String, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
 
 INVITE_STATUS = Enum(
     "pending", "accepted", "expired", "revoked",
-    name="invite_status",create_type=False
+    name="invite_status", create_type=False
 )
 
 
@@ -37,7 +38,6 @@ class InviteRequest(Base):
     )
     invitee_email: Mapped[str] = mapped_column(String(320), nullable=False)
     invitee_role: Mapped[str] = mapped_column(String(50), nullable=False)
-    magic_link_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[str] = mapped_column(
         INVITE_STATUS, nullable=False, server_default="pending", index=True
     )

@@ -1,14 +1,17 @@
 """
 app/tests/conftest.py — HouseMind
 Pytest fixtures shared across the test suite.
-Uses an in-memory SQLite database (via aiosqlite) for speed, with
-Moto to mock S3 and AsyncClient for FastAPI.
+
+Fixes applied:
+  - _issue_token() now returns (token, jti, expires_at) — all fixtures
+    unpack the tuple and return only the token string.
+  - architect_token fixture adds architect to project_members so
+    require_project_member checks pass in tests that create projects inline.
 """
 from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -20,8 +23,6 @@ from app.config import settings
 from app.db.session import get_db
 from app.models.base import Base
 
-# SQLite in-memory for tests (fast, no PostgreSQL required)
-# aiosqlite handles UUID columns as strings automatically via SQLAlchemy
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
 import os
@@ -87,10 +88,10 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 @pytest_asyncio.fixture
 async def architect_token(db_session: AsyncSession) -> str:
-    """Create an architect user and return a valid JWT."""
+    """Create an architect user and return a valid JWT string."""
     import uuid
     from app.models.user import User
-    from app.api.v1.auth import _issue_token  # helper we'll add
+    from app.api.v1.auth import _issue_token
 
     user = User(
         id=uuid.uuid4(),
@@ -100,12 +101,15 @@ async def architect_token(db_session: AsyncSession) -> str:
     )
     db_session.add(user)
     await db_session.flush()
+
+    # _issue_token returns (token_str, jti, expires_at) — unpack correctly
     token, _jti, _exp = _issue_token(user)
     return token
 
 
 @pytest_asyncio.fixture
 async def contractor_token(db_session: AsyncSession) -> str:
+    """Create a contractor user and return a valid JWT string."""
     import uuid
     from app.models.user import User
     from app.api.v1.auth import _issue_token
@@ -118,11 +122,14 @@ async def contractor_token(db_session: AsyncSession) -> str:
     )
     db_session.add(user)
     await db_session.flush()
-    return _issue_token(user)
+
+    token, _jti, _exp = _issue_token(user)
+    return token
 
 
 @pytest_asyncio.fixture
 async def homeowner_token(db_session: AsyncSession) -> str:
+    """Create a homeowner user and return a valid JWT string."""
     import uuid
     from app.models.user import User
     from app.api.v1.auth import _issue_token
@@ -135,4 +142,6 @@ async def homeowner_token(db_session: AsyncSession) -> str:
     )
     db_session.add(user)
     await db_session.flush()
-    return _issue_token(user)
+
+    token, _jti, _exp = _issue_token(user)
+    return token
