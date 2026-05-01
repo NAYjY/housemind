@@ -3,17 +3,7 @@
 import { type Annotation } from "@/store/annotationStore";
 import { type ProductDetail } from "@/hooks/useProducts";
 import { useResolveAnnotation, useReopenAnnotation } from "@/hooks/useAnnotations";
-
-const OBJECT_DEFS: Record<number, { emoji: string; label: string }> = {
-  101: { emoji: "😊", label: "Smile" },
-  102: { emoji: "⭐", label: "Star" },
-  103: { emoji: "❤️", label: "Heart" },
-  104: { emoji: "📷", label: "Camera" },
-  105: { emoji: "🌿", label: "Leaf" },
-  106: { emoji: "🗺️", label: "Map" },
-  107: { emoji: "💵", label: "Dollar" },
-  108: { emoji: "🏷️", label: "Tag" },
-};
+import { OBJECT_DEFS } from  "@/components/workspace/FanEmojiMenu";
 
 interface Props {
   product: ProductDetail;
