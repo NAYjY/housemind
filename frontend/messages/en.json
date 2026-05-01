@@ -18,7 +18,26 @@
     "readOnly": "Read-only mode",
     "noAnnotations": "No annotations yet",
     "annotationResolved": "Resolved",
-    "annotationOpen": "Open"
+    "annotationOpen": "Open",
+    "holdToAnnotate": "Hold to annotate",
+    "signInToAnnotate": "Sign in to annotate",
+    "notSignedIn": "Not signed in — annotations won't save.",
+    "signInLink": "Sign in →",
+    "selectSubproject": "Select subproject",
+    "selectSubprojectDesc": "Tap the project name above to select or add a subproject",
+    "heroSub": "Visual decisions workspace",
+    "projects": "Projects"
+  },
+  "subproject": {
+    "subprojects": "Subprojects",
+    "noSubprojects": "No subprojects yet",
+    "addSubproject": "Add subproject",
+    "nameLabel": "Subproject name *",
+    "namePlaceholder": "e.g. Bedroom, Bathroom",
+    "descPlaceholder": "Description (optional)",
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating…"
   },
   "product": {
     "details": "Product details",

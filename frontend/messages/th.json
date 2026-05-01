@@ -18,7 +18,26 @@
     "readOnly": "โหมดอ่านอย่างเดียว",
     "noAnnotations": "ยังไม่มีหมายเหตุ",
     "annotationResolved": "แก้ไขแล้ว",
-    "annotationOpen": "รอดำเนินการ"
+    "annotationOpen": "รอดำเนินการ",
+    "holdToAnnotate": "กดค้างเพื่อเพิ่มหมายเหตุ",
+    "signInToAnnotate": "เข้าสู่ระบบเพื่อเพิ่มหมายเหตุ",
+    "notSignedIn": "ยังไม่ได้เข้าสู่ระบบ — หมายเหตุจะไม่ถูกบันทึก",
+    "signInLink": "เข้าสู่ระบบ →",
+    "selectSubproject": "เลือกโครงการย่อย",
+    "selectSubprojectDesc": "กดชื่อโครงการด้านบนเพื่อเลือกหรือเพิ่มโครงการย่อย",
+    "heroSub": "พื้นที่ตัดสินใจแบบวิชวล",
+    "projects": "โครงการ"
+  },
+  "subproject": {
+    "subprojects": "โครงการย่อย",
+    "noSubprojects": "ยังไม่มีโครงการย่อย",
+    "addSubproject": "เพิ่มโครงการย่อย",
+    "nameLabel": "ชื่อโครงการย่อย *",
+    "namePlaceholder": "เช่น ห้องนอน, ห้องน้ำ",
+    "descPlaceholder": "รายละเอียด (optional)",
+    "cancel": "ยกเลิก",
+    "create": "สร้าง",
+    "creating": "กำลังสร้าง…"
   },
   "product": {
     "details": "รายละเอียดสินค้า",
