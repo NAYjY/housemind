@@ -6,6 +6,7 @@ import type { ProductDetail } from "@/hooks/useProducts";
 import { useProjectProducts, useUnlinkProduct, useUnlinkProductByProductId } from "@/hooks/useProducts";
 import { OBJECT_DEFS } from "./FanEmojiMenu";
 import { useState } from "react";
+import styles from "./ProductGrid.module.css";
 
 interface Props {
   projectId: string;
@@ -34,9 +35,9 @@ export function ProductGrid({
 
   return (
     <div style={{ background: "#FAFAF8" }}>
-      <div className="hm-section-header">
+      <div className={styles.sectionHeader}>
         <div>
-          <div className="hm-section-title">
+          <div className={styles.sectionTitle}>
             {showAll
               ? "All Products"
               : activeAnnotation
@@ -52,11 +53,11 @@ export function ProductGrid({
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {canAttach && activeAnnotation && !showAll && (
-            <button onClick={onAttachProduct} className="hm-grid-attach-btn">
+            <button onClick={onAttachProduct} className={styles.attachBtn}>
               + Attach
             </button>
           )}
-          <button onClick={onShowAllToggle} className="hm-grid-toggle-btn">
+          <button onClick={onShowAllToggle} className={styles.toggleBtn}>
             {showAll ? "Filter by pin" : "Show all"}
           </button>
         </div>
@@ -69,7 +70,7 @@ export function ProductGrid({
       )}
 
       {!isLoading && products.length === 0 && (
-        <div className="hm-grid-empty">
+        <div className={styles.empty}>
           {activeAnnotation && !showAll
             ? "No products for this pin yet — tap Attach"
             : "No products in this project yet"}
@@ -77,11 +78,11 @@ export function ProductGrid({
       )}
 
       {!isLoading && products.length > 0 && (
-        <div className="hm-product-grid">
+        <div className={styles.grid}>
           {products.map((p) => (
             <div
               key={p.id}
-              className="hm-prod-card"
+              className={styles.card}
               onClick={() => onProductClick(p)}
               style={{ cursor: "pointer", position: "relative" }}
             >
@@ -104,23 +105,23 @@ export function ProductGrid({
                       }
                     }}
                   disabled={unlinkingId === p.id}
-                  className="hm-grid-unlink-btn"
+                  className={styles.unlinkBtn}
                   title="Remove from project"
                 >
                   ×
                 </button>
               )}
-              <div className="hm-prod-img">
+              <div className={styles.img}>
                 {p.thumbnail_url ? (
                   <img src={p.thumbnail_url} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <div className="hm-prod-letter">{p.name[0]}</div>
+                  <div className={styles.letter}>{p.name[0]}</div>
                 )}
               </div>
-              <div className="hm-prod-title">{p.name}</div>
-              {p.brand && <div className="hm-prod-tag">{p.brand}</div>}
+              <div className={styles.prodTitle}>{p.name}</div>
+              {p.brand && <div className={styles.tag}>{p.brand}</div>}
               {p.price != null && (
-                <div className="hm-prod-contact">฿{p.price.toLocaleString("th-TH")}</div>
+                <div className={styles.contact}>฿{p.price.toLocaleString("th-TH")}</div>
               )}
             </div>
           ))}

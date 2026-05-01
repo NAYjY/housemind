@@ -24,6 +24,7 @@ import { WorkspaceCanvas } from "./WorkspaceCanvas";
 import { useSlides } from "@/hooks/useSlides";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { authFetch } from "@/lib/auth";
+import styles from "./WorkspaceShell.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -80,11 +81,11 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
     <div style={{ position: "relative" }}>
       <button
         onClick={() => { setOpen((v) => !v); setShowAddForm(false); }}
-        className="hm-subnav-trigger"
+        className={styles.subnavTrigger}
       >
         <div>
-          {!isShell && <div className="hm-subnav-parent-label">{parentName}</div>}
-          <div className="hm-subnav-current-label">
+          {!isShell && <div className={styles.subnavParentLabel}>{parentName}</div>}
+          <div className={styles.subnavCurrentLabel}>
             {currentLabel}
             <svg
               width="10" height="6" viewBox="0 0 10 6" fill="none"
@@ -98,12 +99,12 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
 
       {open && (
         <>
-          <div className="hm-subnav-backdrop" onClick={() => { setOpen(false); setShowAddForm(false); }} />
-          <div className="hm-subnav-dropdown">
-            <div className="hm-subnav-dropdown-header">{parentName} · โครงการย่อย</div>
+          <div className={styles.subnavBackdrop} onClick={() => { setOpen(false); setShowAddForm(false); }} />
+          <div className={styles.subnavDropdown}>
+            <div className={styles.subnavDropdownHeader}>{parentName} · โครงการย่อย</div>
 
             {subprojects.length === 0 && (
-              <div className="hm-subnav-empty">ยังไม่มีโครงการย่อย</div>
+              <div className={styles.subnavEmpty}>ยังไม่มีโครงการย่อย</div>
             )}
 
             {subprojects.map((sub) => {
@@ -112,49 +113,49 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
                 <button
                   key={sub.id}
                   onClick={() => { setOpen(false); if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`); }}
-                  className={`hm-subnav-item ${isCurrent ? "active" : ""}`}
+                  className={`${styles.subnavItem} ${isCurrent ? styles.active : ""}`}
                 >
-                  <div className="hm-subnav-item-icon">
+                  <div className={styles.subnavItemIcon}>
                     {sub.name[0]?.toUpperCase() ?? "S"}
                   </div>
-                  <div className="hm-subnav-item-name">{sub.name}</div>
+                  <div className={styles.subnavItemName}>{sub.name}</div>
                   {isCurrent && <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>}
                 </button>
               );
             })}
 
             {!showAddForm ? (
-              <button onClick={() => setShowAddForm(true)} className="hm-subnav-add-btn">
-                <span className="hm-subnav-add-icon">+</span>
+              <button onClick={() => setShowAddForm(true)} className={styles.subnavAddBtn}>
+                <span className={styles.subnavAddIcon}>+</span>
                 เพิ่มโครงการย่อย
               </button>
             ) : (
-              <form onSubmit={handleCreate} className="hm-subnav-form">
-                <div className="hm-subnav-form-label">ชื่อโครงการย่อย *</div>
+              <form onSubmit={handleCreate} className={styles.subnavForm}>
+                <div className={styles.subnavFormLabel}>ชื่อโครงการย่อย *</div>
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="เช่น ห้องนอน, ห้องน้ำ"
-                  className="hm-subnav-form-input"
+                  className={styles.subnavFormInput}
                 />
                 <input
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="รายละเอียด (optional)"
-                  className="hm-subnav-form-input"
+                  className={styles.subnavFormInput}
                 />
-                {formError && <div className="hm-subnav-form-error">{formError}</div>}
-                <div className="hm-subnav-form-actions">
+                {formError && <div className={styles.subnavFormError}>{formError}</div>}
+                <div className={styles.subnavFormActions}>
                   <button
                     type="button"
                     onClick={() => { setShowAddForm(false); setNewName(""); setNewDesc(""); setFormError(""); }}
-                    className="hm-subnav-form-cancel"
+                    className={styles.subnavFormCancel}
                   >ยกเลิก</button>
                   <button
                     type="submit"
                     disabled={creating || !newName.trim()}
-                    className="hm-subnav-form-submit"
+                    className={styles.subnavFormSubmit}
                   >{creating ? "กำลังสร้าง…" : "สร้าง"}</button>
                 </div>
               </form>
@@ -171,24 +172,24 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
 function ShellView({ projectId }: { projectId: string }) {
   return (
     <div className="hm-app">
-      <div className="hm-hero-bar">
+      <div className={styles.heroBar}>
         <div>
-          <div className="hm-wordmark">House<span>Mind</span></div>
-          <div className="hm-hero-sub">Visual decisions workspace</div>
+          <div className={styles.wordmark}>House<span>Mind</span></div>
+          <div className={styles.heroSub}>Visual decisions workspace</div>
         </div>
         <a href="/th/profile" style={{ textDecoration: "none" }}>
-          <button className="hm-role-badge">← โครงการ</button>
+          <button className={styles.roleBadge}>← โครงการ</button>
         </a>
       </div>
 
-      <div className="hm-proj-nav">
+      <div className={styles.projNav}>
         <SubprojectNav projectId={projectId} isShell={true} />
       </div>
 
-      <div className="hm-shell-empty">
-        <div className="hm-shell-empty-icon">🏗️</div>
-        <div className="hm-shell-empty-title">เลือกโครงการย่อย</div>
-        <div className="hm-shell-empty-desc">
+      <div className={styles.shellEmpty}>
+        <div className={styles.shellEmptyIcon}>🏗️</div>
+        <div className={styles.shellEmptyTitle}>เลือกโครงการย่อย</div>
+        <div className={styles.shellEmptyDesc}>
           กดชื่อโครงการด้านบนเพื่อเลือกหรือเพิ่มโครงการย่อย
         </div>
       </div>
@@ -376,23 +377,23 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
       <div className="hm-app">
         {!auth.isAuthenticated && (
-          <div className="hm-no-auth">
+          <div className={styles.noAuthBanner}>
             Not signed in — annotations won&apos;t save.{" "}
             <a href="/login">Sign in →</a>
           </div>
         )}
 
-        <div className="hm-hero-bar">
+        <div className={styles.heroBar}>
           <div>
-            <div className="hm-wordmark">House<span>Mind</span></div>
-            <div className="hm-hero-sub">Visual decisions workspace</div>
+            <div className={styles.wordmark}>House<span>Mind</span></div>
+            <div className={styles.heroSub}>Visual decisions workspace</div>
           </div>
           <a href="/th/profile" style={{ textDecoration: "none" }}>
-            <button className="hm-role-badge">{auth.role ?? "Sign in"}</button>
+            <button className={styles.roleBadge}>{auth.role ?? "Sign in"}</button>
           </a>
         </div>
 
-        <div className="hm-proj-nav">
+        <div className={styles.projNav}>
           <SubprojectNav projectId={projectId} isShell={false} />
         </div>
 

@@ -1,0 +1,81 @@
+/* WorkspaceShell + SubprojectNav + ShellView */
+
+.heroBar {
+  background: #1A1A18;
+  padding: 18px 20px 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.wordmark {
+  font-family: 'DM Serif Display', serif;
+  font-size: 24px;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.wordmark span { color: #C9A84C; }
+.heroSub {
+  font-size: 9px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.roleBadge {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 5px 10px; border-radius: 20px;
+  border: 0.5px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.55);
+  background: transparent; cursor: pointer;
+}
+.projNav {
+  background: #F5F4F0;
+  border-bottom: 0.5px solid #E8E6E0;
+  padding: 10px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.noAuthBanner {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #1A1A18; color: #fff; font-size: 12px;
+  padding: 10px 18px; border-radius: 20px;
+  display: flex; align-items: center; gap: 10px;
+  z-index: 300; box-shadow: 0 4px 20px rgba(0,0,0,0.3); white-space: nowrap;
+}
+.noAuthBanner a { color: #C9A84C; text-decoration: none; font-weight: 500; }
+
+/* SubprojectNav */
+.subnavTrigger { display:flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer; padding:2px 0; }
+.subnavParentLabel { font-size:10px; color:#888780; letter-spacing:0.06em; text-align:left; }
+.subnavCurrentLabel { font-size:14px; font-weight:600; color:#1A1A18; display:flex; align-items:center; gap:4px; }
+.subnavBackdrop { position:fixed; inset:0; z-index:48; }
+.subnavDropdown { position:absolute; top:calc(100% + 8px); left:0; z-index:49; background:#fff; border:0.5px solid #E8E6E0; border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,0.12); min-width:220px; max-width:280px; overflow:hidden; }
+.subnavDropdownHeader { padding:10px 14px 6px; font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#B0A090; border-bottom:0.5px solid #F5F4F0; }
+.subnavEmpty { padding:12px 14px; font-size:12px; color:#B0A090; }
+.subnavItem { width:100%; display:flex; align-items:center; gap:10px; padding:10px 14px; background:transparent; border:none; border-bottom:0.5px solid #F5F4F0; cursor:pointer; text-align:left; font-family:inherit; transition:background 0.15s; }
+.subnavItem.active { background:#F5EDD8; cursor:default; }
+.subnavItemIcon { width:28px; height:28px; border-radius:8px; background:#F5F4F0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#888780; flex-shrink:0; }
+.subnavItem.active .subnavItemIcon { background:#C49A3C; color:#fff; }
+.subnavItemName { font-size:13px; font-weight:400; color:#1A1A18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0; }
+.subnavItem.active .subnavItemName { font-weight:600; color:#8B6520; }
+.subnavAddBtn { width:100%; display:flex; align-items:center; gap:8px; padding:10px 14px; background:transparent; border:none; cursor:pointer; text-align:left; font-family:inherit; color:#8B6520; font-size:13px; font-weight:500; }
+.subnavAddIcon { width:28px; height:28px; border-radius:8px; background:#FEF3DC; border:1px dashed #C49A3C; display:flex; align-items:center; justify-content:center; font-size:16px; color:#C49A3C; flex-shrink:0; }
+.subnavForm { padding:10px 14px 12px; }
+.subnavFormLabel { font-size:10px; font-weight:700; color:#C49A3C; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px; }
+.subnavFormInput { width:100%; height:36px; border:0.5px solid #E8E6E0; border-radius:8px; padding:0 10px; font-size:12px; font-family:inherit; outline:none; background:#fff; color:#1A1A18; box-sizing:border-box; margin-bottom:6px; }
+.subnavFormInput:focus { border-color:#C49A3C; }
+.subnavFormError { font-size:11px; color:#E24B4A; margin-bottom:6px; }
+.subnavFormActions { display:flex; gap:6px; }
+.subnavFormCancel { flex:1; height:32px; background:#F5F4F0; border:none; border-radius:8px; font-size:11px; color:#888; cursor:pointer; font-family:inherit; }
+.subnavFormSubmit { flex:2; height:32px; background:#1A1A18; border:none; border-radius:8px; font-size:11px; font-weight:600; color:#fff; cursor:pointer; font-family:inherit; }
+.subnavFormSubmit:disabled { background:#E8E6E0; color:#aaa; cursor:not-allowed; }
+
+/* ShellView empty state */
+.shellEmpty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 24px; text-align:center; color:#B0A090; }
+.shellEmptyIcon { font-size:40px; margin-bottom:16px; }
+.shellEmptyTitle { font-family:'DM Serif Display',serif; font-size:18px; color:#1A1A18; margin-bottom:8px; }
+.shellEmptyDesc { font-size:13px; line-height:1.6; }
+
+/* ImageDelete confirm */
+.imgdelOverlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; }
+.imgdelCard { background:#fff; border-radius:16px; padding:24px 24px 20px; width:300px; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
+.imgdelWarn { font-size:12px; color:#C05A30; background:#FEF0E8; border:0.5px solid #FAD9C8; border-radius:8px; padding:8px 12px; margin-bottom:16px; text-align:center; }

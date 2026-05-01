@@ -1,6 +1,7 @@
 "use client";
 
 import { useAnnotationStore } from "@/store/annotationStore";
+import styles from "./FilmStrip.module.css";
 
 interface FilmThumbProps {
   imageId: string;
@@ -17,7 +18,7 @@ export function FilmThumb({ imageId, url, index, isActive, onClick }: FilmThumbP
 
   return (
     <div
-      className={`hm-film-thumb ${isActive ? "active" : ""}`}
+      className={`${styles.thumb} ${isActive ? styles.active : ""}`}
       onClick={onClick}
       title={`${annotationCount} annotation${annotationCount !== 1 ? "s" : ""}`}
     >

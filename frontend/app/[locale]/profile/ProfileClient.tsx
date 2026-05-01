@@ -1,13 +1,12 @@
 "use client";
 
-// app/[locale]/profile/page.tsx — HouseMind
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, useCreateProject, type ProjectListItem, type ProjectDetail } from "@/hooks/useProjects";
 import { logout, authFetch } from "@/lib/auth";
 import { InviteModal } from "@/components/project/InviteModal";
+import styles from "./Profile.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -42,15 +41,15 @@ function ProjectCard({ project, onClick, onInvite, isArchitect }: ProjectCardPro
 
   return (
     <div style={{ position: "relative" }}>
-      <div className="profile-proj-card" onClick={onClick}>
-        <div className="profile-proj-icon">
+      <div className={styles.projCard} onClick={onClick}>
+        <div className={styles.projIcon}>
           {project.name[0]?.toUpperCase() ?? "P"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="profile-proj-name">{project.name}</div>
-          <div className="profile-proj-date">{fmt(project.created_at)}</div>
+          <div className={styles.projName}>{project.name}</div>
+          <div className={styles.projDate}>{fmt(project.created_at)}</div>
         </div>
-        <div className={`profile-proj-chip ${chipClass}`}>
+        <div className={`${styles.projChip} ${styles[chipClass as keyof typeof styles] ?? ""}`}>
           {chipClass.charAt(0).toUpperCase() + chipClass.slice(1)}
         </div>
         <svg width="7" height="12" viewBox="0 0 7 12" fill="none" style={{ flexShrink: 0 }}>
@@ -62,20 +61,10 @@ function ProjectCard({ project, onClick, onInvite, isArchitect }: ProjectCardPro
         <button
           onClick={(e) => { e.stopPropagation(); onInvite(); }}
           style={{
-            position: "absolute",
-            right: 48,
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: 10,
-            fontWeight: 700,
-            color: "#8B6520",
-            background: "#FEF3DC",
-            border: "1px solid #F0D890",
-            borderRadius: 20,
-            padding: "4px 10px",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            letterSpacing: "0.04em",
+            position: "absolute", right: 48, top: "50%", transform: "translateY(-50%)",
+            fontSize: 10, fontWeight: 700, color: "#8B6520", background: "#FEF3DC",
+            border: "1px solid #F0D890", borderRadius: 20, padding: "4px 10px",
+            cursor: "pointer", whiteSpace: "nowrap", letterSpacing: "0.04em",
           }}
         >
           + เชิญ
@@ -113,35 +102,35 @@ function CreateProjectModal({ onClose, onCreate }: CreateModalProps) {
 
   return (
     <div
-      className="hm-create-modal-overlay"
+      className={styles.createOverlay}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="hm-create-modal-sheet">
-        <div className="hm-create-modal-handle" />
-        <div className="hm-create-modal-title">สร้างโครงการใหม่</div>
-        <div className="hm-create-modal-sub">New Project</div>
+      <div className={styles.createSheet}>
+        <div className={styles.createHandle} />
+        <div className={styles.createTitle}>สร้างโครงการใหม่</div>
+        <div className={styles.createSub}>New Project</div>
 
         <form onSubmit={handleSubmit}>
-          <div className="hm-create-modal-label">ชื่อโครงการ *</div>
+          <div className={styles.createLabel}>ชื่อโครงการ *</div>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="เช่น บ้านพักอาศัย สุขุมวิท 101"
             autoFocus
-            className="hm-create-modal-input"
+            className={styles.createInput}
           />
-          <div className="hm-create-modal-label">รายละเอียด (optional)</div>
+          <div className={styles.createLabel}>รายละเอียด (optional)</div>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="รายละเอียดโครงการ..."
             rows={3}
-            className="hm-create-modal-textarea"
+            className={styles.createTextarea}
           />
-          {error && <div className="hm-create-modal-error">{error}</div>}
-          <div className="hm-create-modal-actions">
-            <button type="button" onClick={onClose} className="hm-create-modal-cancel">ยกเลิก</button>
-            <button type="submit" disabled={loading || !name.trim()} className="hm-create-modal-submit">
+          {error && <div className={styles.createError}>{error}</div>}
+          <div className={styles.createActions}>
+            <button type="button" onClick={onClose} className={styles.createCancel}>ยกเลิก</button>
+            <button type="submit" disabled={loading || !name.trim()} className={styles.createSubmit}>
               {loading ? "กำลังสร้าง…" : "สร้างโครงการ"}
             </button>
           </div>
@@ -164,11 +153,10 @@ export function ProfileClient() {
   const [inviteProject, setInviteProject] = useState<ProjectListItem | null>(null);
 
   async function handleSignOut() {
-    await logout(); 
+    await logout();
     router.push("/login");
   }
 
-  // Navigate to first subproject if available, else to main project shell
   async function handleProjectClick(project: ProjectListItem) {
     try {
       const res = await authFetch(`${API}/projects/${project.id}`);
@@ -194,7 +182,7 @@ export function ProfileClient() {
   const displayProjects = isActiveRole ? projects : [];
 
   return (
-    <div className="profile-wrap">
+    <div className={styles.wrap}>
 
       {createModalOpen && (
         <CreateProjectModal
@@ -211,50 +199,48 @@ export function ProfileClient() {
         />
       )}
 
-      {/* ── Header ── */}
-      <div className="profile-header">
-        <div className="profile-topbar">
-          <div className="profile-wordmark">House<span>Mind</span></div>
-          <button className="profile-signout" onClick={handleSignOut}>ออกจากระบบ</button>
+      <div className={styles.header}>
+        <div className={styles.topbar}>
+          <div className={styles.wordmark}>House<span>Mind</span></div>
+          <button className={styles.signout} onClick={handleSignOut}>ออกจากระบบ</button>
         </div>
 
-        <div className="profile-user-row">
-          <div className="profile-avatar">
+        <div className={styles.userRow}>
+          <div className={styles.avatar}>
             {auth.user?.email?.[0]?.toUpperCase() ?? "?"}
           </div>
           <div>
-            <div className="profile-user-name">{auth.user?.email?.split("@")[0] ?? "Loading…"}</div>
-            <div className="profile-user-email">{auth.user?.email ?? ""}</div>
+            <div className={styles.userName}>{auth.user?.email?.split("@")[0] ?? "Loading…"}</div>
+            <div className={styles.userEmail}>{auth.user?.email ?? ""}</div>
           </div>
         </div>
 
-        <div className="profile-role-tabs">
+        <div className={styles.roleTabs}>
           {ROLES.map((role) => {
             const meta = ROLE_META[role];
             const isJwtRole = role === auth.role;
             return (
               <button
                 key={role}
-                className={`profile-role-tab ${activeRole === role ? "active" : ""}`}
+                className={`${styles.roleTab} ${activeRole === role ? styles.active : ""}`}
                 onClick={() => setActiveRole(role)}
               >
-                <span className="profile-role-tab-icon">{meta.icon}</span>
-                <span className="profile-role-tab-name">{meta.th}</span>
-                {isJwtRole && <span className="profile-active-dot" />}
+                <span className={styles.roleTabIcon}>{meta.icon}</span>
+                <span className={styles.roleTabName}>{meta.th}</span>
+                {isJwtRole && <span className={styles.activeDot} />}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* ── Body ── */}
-      <div className="profile-body">
-        <div className="profile-section-label">{ROLE_META[activeRole].th}</div>
-        <div className="profile-section-desc">{ROLE_META[activeRole].desc}</div>
+      <div className={styles.body}>
+        <div className={styles.sectionLabel}>{ROLE_META[activeRole].th}</div>
+        <div className={styles.sectionDesc}>{ROLE_META[activeRole].desc}</div>
 
         {isLoading && isActiveRole && (
-          <div className="profile-loading">
-            {[1, 2, 3].map((n) => <div key={n} className="profile-skeleton" />)}
+          <div className={styles.loading}>
+            {[1, 2, 3].map((n) => <div key={n} className={styles.skeleton} />)}
           </div>
         )}
 
@@ -266,7 +252,7 @@ export function ProfileClient() {
 
         {!isLoading && isActiveRole && displayProjects.length > 0 && (
           <>
-            <div className="profile-project-list">
+            <div className={styles.projectList}>
               {displayProjects.map((p) => (
                 <ProjectCard
                   key={p.id}
@@ -278,7 +264,7 @@ export function ProfileClient() {
               ))}
             </div>
             {auth.role === "architect" && (
-              <button className="profile-new-btn" onClick={() => setCreateModalOpen(true)}>
+              <button className={styles.newBtn} onClick={() => setCreateModalOpen(true)}>
                 <span style={{ fontSize: 16 }}>+</span>
                 สร้างโครงการใหม่ · New Project
               </button>
@@ -287,18 +273,18 @@ export function ProfileClient() {
         )}
 
         {!isLoading && isActiveRole && displayProjects.length === 0 && !error && (
-          <div className="profile-empty">
-            <div className="profile-empty-icon">{ROLE_META[activeRole].icon}</div>
-            <div className="profile-empty-title">
+          <div className={styles.empty}>
+            <div className={styles.emptyIcon}>{ROLE_META[activeRole].icon}</div>
+            <div className={styles.emptyTitle}>
               {activeRole === "architect" ? "ยังไม่มีโครงการ" : "ยังไม่มีโครงการที่เข้าร่วม"}
             </div>
-            <div className="profile-empty-sub">
+            <div className={styles.emptySub}>
               {activeRole === "architect"
                 ? "Create your first project to get started."
                 : "You'll appear here once an architect adds you to a project."}
             </div>
             {activeRole === "architect" && (
-              <button className="profile-new-btn" onClick={() => setCreateModalOpen(true)}>
+              <button className={styles.newBtn} onClick={() => setCreateModalOpen(true)}>
                 <span style={{ fontSize: 16 }}>+</span>สร้างโครงการแรก
               </button>
             )}
@@ -306,10 +292,10 @@ export function ProfileClient() {
         )}
 
         {!isActiveRole && (
-          <div className="profile-empty">
-            <div className="profile-empty-icon">{ROLE_META[activeRole].icon}</div>
-            <div className="profile-empty-title">{ROLE_META[activeRole].th}</div>
-            <div className="profile-empty-sub">
+          <div className={styles.empty}>
+            <div className={styles.emptyIcon}>{ROLE_META[activeRole].icon}</div>
+            <div className={styles.emptyTitle}>{ROLE_META[activeRole].th}</div>
+            <div className={styles.emptySub}>
               {`Your account is a ${auth.role ?? "unknown"} account.`}<br />
               Multi-role access coming soon.
             </div>

@@ -2,6 +2,7 @@
 
 import { FilmThumb } from "./FilmThumb";
 import type { Slide } from "@/hooks/useSlides";
+import styles from "./FilmStrip.module.css";
 
 interface FilmStripProps {
   slides: Slide[];
@@ -33,9 +34,9 @@ export function FilmStrip({
   onFileUpload,
 }: FilmStripProps) {
   return (
-    <div className={`hm-filmstrip ${expanded ? "expanded" : "collapsed"}`}>
+    <div className={`${styles.strip} ${expanded ? styles.expanded : styles.collapsed}`}>
       <div
-        className="hm-tray-row"
+        className={styles.trayRow}
         onWheel={(e) => {
           e.preventDefault();
           e.currentTarget.scrollLeft += e.deltaY;
@@ -51,17 +52,17 @@ export function FilmStrip({
             onClick={() => onSlideChange(i)}
           />
         ))}
-        <button className="hm-film-add" onClick={onToggleExpand}>
-          <span className="hm-film-add-icon">+</span>
-          <span className="hm-film-add-label">Add</span>
+        <button className={styles.addBtn} onClick={onToggleExpand}>
+          <span className={styles.addIcon}>+</span>
+          <span className={styles.addLabel}>Add</span>
         </button>
       </div>
 
       {expanded && (
-        <div className="hm-tray-upload-row">
-          <div className="hm-tray-input-row">
+        <div className={styles.uploadRow}>
+          <div className={styles.inputRow}>
             <label
-              className="hm-tray-file-btn"
+              className={styles.fileBtn}
               style={{ opacity: uploading || !isAuthenticated ? 0.5 : 1 }}
             >
               📁 {uploading ? "Uploading…" : "Upload image"}
@@ -78,7 +79,7 @@ export function FilmStrip({
             </label>
             <div style={{ flex: 1 }} />
             <button
-              className="hm-tray-close"
+              className={styles.closeBtn}
               onClick={() => {
                 onToggleExpand();
                 onRefInputChange("");
@@ -87,9 +88,9 @@ export function FilmStrip({
               ×
             </button>
           </div>
-          <div className="hm-tray-input-row">
+          <div className={styles.inputRow}>
             <input
-              className="hm-tray-input"
+              className={styles.input}
               placeholder="Or paste image URL…"
               value={refInput}
               onChange={(e) => onRefInputChange(e.target.value)}
@@ -98,14 +99,14 @@ export function FilmStrip({
               }}
             />
             <button
-              className="hm-tray-submit"
+              className={styles.submitBtn}
               onClick={() => onUrlSubmit(refInput)}
             >
               Add
             </button>
           </div>
           {uploadError && (
-            <div className="hm-upload-error">⚠ {uploadError}</div>
+            <div className={styles.uploadError}>⚠ {uploadError}</div>
           )}
         </div>
       )}

@@ -1,21 +1,9 @@
 "use client";
 
-/**
- * components/project/InviteModal.tsx — HouseMind
- *
- * Architect searches registered users by email/name and adds them to a project.
- *
- * Flow:
- *   1. User has already registered at /register
- *   2. Architect types email → live search hits GET /v1/users/search
- *   3. Architect picks a user + role → POST /v1/invites
- *   4. User is added to project_members immediately
- *   5. Next time user logs in, the project appears in their profile
- */
-
-
 import { useState, useEffect, useRef } from "react";
 import { authFetch } from "@/lib/auth";
+import styles from "./InviteModal.module.css";
+import closeBtnStyles from "@/components/shared/CloseBtn.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -102,80 +90,75 @@ export function InviteModal({ projectId, projectName, onClose }: Props) {
 
   return (
     <div
-      className="hm-invite-overlay"
+      className={styles.overlay}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="hm-invite-sheet">
+      <div className={styles.sheet}>
 
-        {/* Header */}
-        <div className="hm-invite-header">
+        <div className={styles.header}>
           <div>
-            <div className="hm-invite-header-title">เพิ่มผู้ร่วมงาน</div>
-            <div className="hm-invite-header-sub">Add member to "{projectName}"</div>
+            <div className={styles.headerTitle}>เพิ่มผู้ร่วมงาน</div>
+            <div className={styles.headerSub}>Add member to "{projectName}"</div>
           </div>
-          <button onClick={onClose} className="hm-close-btn">×</button>
+          <button onClick={onClose} className={closeBtnStyles.closeBtn}>×</button>
         </div>
 
-        {/* Body */}
-        <div className="hm-invite-body">
+        <div className={styles.body}>
 
-          {/* Added this session */}
           {added.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <div className="hm-invite-added-label">เพิ่มแล้ว · Added</div>
+              <div className={styles.addedLabel}>เพิ่มแล้ว · Added</div>
               {added.map((u) => (
-                <div key={u.id} className="hm-invite-added-row">
+                <div key={u.id} className={styles.addedRow}>
                   <UserAvatar name={u.full_name} size={28} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="hm-invite-added-name">{u.full_name}</div>
-                    <div className="hm-invite-added-email">{u.email}</div>
+                    <div className={styles.addedName}>{u.full_name}</div>
+                    <div className={styles.addedEmail}>{u.email}</div>
                   </div>
                   <span style={{ fontSize: 14 }}>✓</span>
                 </div>
               ))}
-              <div className="hm-invite-divider" />
+              <div className={styles.divider} />
             </div>
           )}
 
-          {/* Search */}
-          <div className="hm-invite-section-label">ค้นหาผู้ใช้ · Search by email or name</div>
-          <div className="hm-invite-search-wrap">
+          <div className={styles.sectionLabel}>ค้นหาผู้ใช้ · Search by email or name</div>
+          <div className={styles.searchWrap}>
             <input
               type="text"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setSelected(null); setError(""); }}
               placeholder="พิมพ์ email หรือชื่อ... (อย่างน้อย 2 ตัวอักษร)"
               autoFocus
-              className="hm-invite-search-input"
+              className={styles.searchInput}
             />
-            {searching && <div className="hm-invite-search-spinner" />}
+            {searching && <div className={styles.searchSpinner} />}
             {query && !searching && (
               <button
                 onClick={() => { setQuery(""); setResults([]); setSelected(null); }}
-                className="hm-invite-search-clear"
+                className={styles.searchClear}
               >×</button>
             )}
           </div>
 
           {query.trim().length < 2 && query.length > 0 && (
-            <div className="hm-invite-hint">
+            <div className={styles.hint}>
               พิมพ์อีก {2 - query.trim().length} ตัวเพื่อค้นหา
             </div>
           )}
 
-          {/* Results */}
           {results.length > 0 && !selected && (
             <div style={{ marginBottom: 12 }}>
               {results.map((u) => (
                 <button
                   key={u.id}
                   onClick={() => { setSelected(u); setResults([]); }}
-                  className="hm-invite-result-btn"
+                  className={styles.resultBtn}
                 >
                   <UserAvatar name={u.full_name} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="hm-invite-result-name">{u.full_name}</div>
-                    <div className="hm-invite-result-email">{u.email}</div>
+                    <div className={styles.resultName}>{u.full_name}</div>
+                    <div className={styles.resultEmail}>{u.email}</div>
                   </div>
                   <span style={{ fontSize: 16, flexShrink: 0 }}>
                     {ROLE_ICONS[u.role] ?? "👤"}
@@ -185,13 +168,12 @@ export function InviteModal({ projectId, projectName, onClose }: Props) {
             </div>
           )}
 
-          {/* No results */}
           {query.trim().length >= 2 && !searching && results.length === 0 && !selected && (
-            <div className="hm-invite-empty">
-              <div className="hm-invite-empty-icon">🔍</div>
-              <div className="hm-invite-empty-text">
+            <div className={styles.emptyWrap}>
+              <div className={styles.emptyIcon}>🔍</div>
+              <div className={styles.emptyText}>
                 ไม่พบผู้ใช้ที่ตรงกัน<br />
-                <span className="hm-invite-empty-sub">
+                <span className={styles.emptySub}>
                   ผู้ใช้ต้องสมัครบัญชีก่อนจึงจะเพิ่มได้<br />
                   They need to register at /register first.
                 </span>
@@ -199,65 +181,63 @@ export function InviteModal({ projectId, projectName, onClose }: Props) {
             </div>
           )}
 
-          {/* Selected + role picker */}
           {selected && (
             <div>
-              <div className="hm-invite-selected-card">
+              <div className={styles.selectedCard}>
                 <UserAvatar name={selected.full_name} size={40} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="hm-invite-selected-name">{selected.full_name}</div>
-                  <div className="hm-invite-selected-email">{selected.email}</div>
+                  <div className={styles.selectedName}>{selected.full_name}</div>
+                  <div className={styles.selectedEmail}>{selected.email}</div>
                 </div>
                 <button
                   onClick={() => { setSelected(null); setQuery(""); setResults([]); setError(""); }}
-                  className="hm-invite-selected-clear"
+                  className={styles.selectedClear}
                 >×</button>
               </div>
 
-              <div className="hm-invite-role-label">บทบาทในโครงการนี้ · Role in this project</div>
-              <div className="hm-invite-role-list">
+              <div className={styles.roleLabel}>บทบาทในโครงการนี้ · Role in this project</div>
+              <div className={styles.roleList}>
                 {ROLES.map((r) => (
                   <button
                     key={r.value}
                     type="button"
                     onClick={() => setRole(r.value)}
-                    className={`hm-invite-role-btn ${role === r.value ? "selected" : ""}`}
+                    className={`${styles.roleBtn} ${role === r.value ? styles.selected : ""}`}
                   >
                     <span style={{ fontSize: 20, flexShrink: 0 }}>{r.icon}</span>
                     <div style={{ flex: 1 }}>
-                      <div className="hm-invite-role-name">
+                      <div className={styles.roleName}>
                         {r.label}
-                        <span className="hm-invite-role-name-en">{r.labelEn}</span>
+                        <span className={styles.roleNameEn}>{r.labelEn}</span>
                       </div>
-                      <div className="hm-invite-role-desc">{r.desc}</div>
+                      <div className={styles.roleDesc}>{r.desc}</div>
                     </div>
-                    {role === r.value && <div className="hm-invite-role-check">✓</div>}
+                    {role === r.value && <div className={styles.roleCheck}>✓</div>}
                   </button>
                 ))}
               </div>
 
-              {error && <div className="hm-invite-error">{error}</div>}
+              {error && <div className={styles.error}>{error}</div>}
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="hm-invite-footer">
+        <div className={styles.footer}>
           {selected ? (
             <button
               onClick={handleAdd}
               disabled={adding}
-              className="hm-invite-submit-btn"
+              className={styles.submitBtn}
             >
               {adding
-                ? <><div className="hm-invite-submit-spinner" />กำลังเพิ่ม…</>
+                ? <><div className={styles.submitSpinner} />กำลังเพิ่ม…</>
                 : `เพิ่ม ${selected.full_name.split(" ")[0]} เป็น ${selectedRoleDef.label} ${selectedRoleDef.icon}`
               }
             </button>
           ) : (
             <button
               onClick={onClose}
-              className={`hm-invite-close-btn ${added.length > 0 ? "done" : ""}`}
+              className={`${styles.closeBtn} ${added.length > 0 ? styles.done : ""}`}
             >
               {added.length > 0 ? `เสร็จสิ้น · Done (${added.length} added)` : "ปิด · Close"}
             </button>
@@ -274,13 +254,8 @@ function UserAvatar({ name, size }: { name: string; size: number }) {
   const color = colors[name.charCodeAt(0) % colors.length];
   return (
     <div
-      className="hm-avatar"
-      style={{
-        width: size,
-        height: size,
-        background: color,
-        fontSize: size * 0.42,
-      }}
+      className={styles.avatar}
+      style={{ width: size, height: size, background: color, fontSize: size * 0.42 }}
     >
       {initial}
     </div>

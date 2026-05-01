@@ -1,9 +1,9 @@
 "use client";
 
-// components/annotation/ProductPickerModal.tsx — HouseMind
-
 import { useState } from "react";
 import { useProductSearch } from "@/hooks/useProducts";
+import styles from "./ProductPickerModal.module.css";
+import closeBtnStyles from "@/components/shared/CloseBtn.module.css";
 
 interface Props {
   projectId: string;
@@ -18,56 +18,53 @@ export function ProductPickerModal({ projectId, onSelect, onClose }: Props) {
   const products = data?.items ?? [];
 
   return (
-    <div className="hm-picker-overlay">
-      <div className="hm-picker-sheet">
-        {/* Header */}
-        <div className="hm-picker-header">
-          <div className="hm-picker-title">Attach Product</div>
-          <button onClick={onClose} className="hm-close-btn">×</button>
+    <div className={styles.overlay}>
+      <div className={styles.sheet}>
+        <div className={styles.header}>
+          <div className={styles.headerTitle}>Attach Product</div>
+          <button onClick={onClose} className={closeBtnStyles.closeBtn}>×</button>
         </div>
 
-        {/* Search */}
-        <div className="hm-picker-search-wrap">
+        <div className={styles.searchWrap}>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search products…"
-            className="hm-picker-input"
+            className={styles.searchInput}
           />
         </div>
 
-        {/* Results */}
-        <div className="hm-picker-results">
+        <div className={styles.results}>
           {isLoading && (
             <div style={{ padding: 24, textAlign: "center" }}>
               <div className="spinner" />
             </div>
           )}
           {!isLoading && products.length === 0 && (
-            <div className="hm-picker-empty">
+            <div className={styles.empty}>
               {q ? "No products found" : "Start typing to search"}
             </div>
           )}
-          <div className="hm-picker-list">
+          <div className={styles.list}>
             {products.map((p) => {
               const isSelected = selected === p.id;
               return (
                 <div
                   key={p.id}
                   onClick={() => setSelected(p.id)}
-                  className={`hm-picker-item ${isSelected ? "selected" : ""}`}
+                  className={`${styles.item} ${isSelected ? styles.selected : ""}`}
                 >
-                  <div className="hm-picker-thumb">
+                  <div className={styles.thumbWrap}>
                     {p.thumbnail_url
                       ? <img src={p.thumbnail_url} alt={p.name} />
                       : <span style={{ fontSize: 18 }}>{p.name[0]}</span>
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="hm-picker-item-name">{p.name}</div>
-                    {p.brand && <div className="hm-picker-item-brand">{p.brand}</div>}
+                    <div className={styles.itemName}>{p.name}</div>
+                    {p.brand && <div className={styles.itemBrand}>{p.brand}</div>}
                     {p.price != null && (
-                      <div className="hm-picker-item-price">
+                      <div className={styles.itemPrice}>
                         ฿{p.price.toLocaleString("th-TH")}
                       </div>
                     )}
@@ -79,12 +76,11 @@ export function ProductPickerModal({ projectId, onSelect, onClose }: Props) {
           </div>
         </div>
 
-        {/* Confirm */}
-        <div className="hm-picker-footer">
+        <div className={styles.footer}>
           <button
             onClick={() => { if (selected) onSelect(selected); }}
             disabled={!selected}
-            className={`hm-picker-confirm ${selected ? "active" : "inactive"}`}
+            className={`${styles.confirmBtn} ${selected ? styles.active : styles.inactive}`}
           >
             Attach to Project
           </button>

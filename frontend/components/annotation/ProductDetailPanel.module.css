@@ -1,0 +1,26 @@
+.wrap { position:fixed; inset:0; background:#FAFAF8; z-index:150; display:flex; flex-direction:column; max-width:430px; margin:0 auto; animation:hm-slide-up 0.22s cubic-bezier(0.32,0.72,0,1); overflow-y:auto; }
+.header { padding:16px 20px; border-bottom:0.5px solid #E8E6E0; display:flex; align-items:center; gap:12px; flex-shrink:0; position:sticky; top:0; background:#FAFAF8; z-index:10; }
+.title { font-size:14px; font-weight:600; color:#1A1A18; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.thumbWrap { width:100%; aspect-ratio:4/3; background:#F5F4F0; flex-shrink:0; overflow:hidden; }
+.thumb { width:100%; height:100%; object-fit:cover; }
+.body { padding:20px 20px 100px; }
+.name { font-size:22px; font-weight:700; color:#1A1A18; margin-bottom:4px; }
+.brand { font-size:13px; color:#888; margin-bottom:12px; }
+.price { display:inline-block; background:#F5EDD4; color:#7A6020; font-size:20px; font-weight:600; padding:8px 16px; border-radius:10px; margin-bottom:20px; }
+.desc { font-size:13px; color:#5A4E40; line-height:1.7; margin-bottom:20px; padding:12px 14px; background:#F5F4F0; border-radius:10px; }
+.specsLabel { font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#888; margin-bottom:8px; }
+.specRow { display:flex; justify-content:space-between; padding:8px 0; border-bottom:0.5px solid #F5F4F0; font-size:13px; }
+.specKey { color:#888; }
+.specVal { color:#1A1A18; font-weight:500; }
+.specs { margin-bottom:20px; }
+.pinBox { margin-bottom:20px; padding:12px 14px; background:#fff; border:0.5px solid #E8E6E0; border-radius:12px; }
+.pinLabel { font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#888; margin-bottom:8px; }
+.pinRow { display:flex; align-items:center; gap:10px; }
+.pinEmoji { font-size:22px; }
+.pinName { font-size:13px; font-weight:500; color:#1A1A18; }
+.pinMeta { font-size:11px; color:#888; }
+.resolvedTag { color:#639922; margin-left:8px; }
+.reopenBtn { width:100%; height:44px; background:#F5F4F0; border:0.5px solid #E8E6E0; border-radius:12px; font-size:13px; font-weight:500; cursor:pointer; }
+.reopenBtn:disabled { opacity:0.5; }
+.resolveBtn { width:100%; height:44px; background:#EAF3DE; border:none; border-radius:12px; color:#3B6D11; font-size:13px; font-weight:500; cursor:pointer; }
+.resolveBtn:disabled { opacity:0.5; }

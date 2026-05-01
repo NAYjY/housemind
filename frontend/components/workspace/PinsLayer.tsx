@@ -4,6 +4,8 @@
 import { useRef } from "react";
 import type { Annotation } from "@/store/annotationStore";
 import { OBJECT_DEFS } from "./FanEmojiMenu";
+import styles from "./PinsLayer.module.css";
+
 
 const PIN_COLORS = [
   "#7F77DD", "#C9A84C", "#639922", "#E24B4A",
@@ -24,7 +26,7 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
   const dragging = useRef<string | null>(null);
 
   const getContainer = () =>
-    document.querySelector(".hm-canvas-wrap") as HTMLDivElement | null;
+    document.querySelector(`.${styles.canvasWrap}`) as HTMLDivElement | null;
 
   return (
     <>
@@ -36,7 +38,7 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
         return (
           <div
             key={ann.id}
-            className="hm-pin"
+            className={styles.pin}
             style={{
               left: `${ann.position_x * 100}%`,
               top: `${ann.position_y * 100}%`,
@@ -99,12 +101,12 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
             }}
           >
             <div
-              className={`hm-pin-bubble ${isActive ? "active" : ""}`}
+              className={styles.bubble + (isActive ? " " + styles.active : "")}
               style={{ background: color, fontSize: 16 }}
             >
-              <div className="hm-pin-inner">{def?.emoji ?? "📍"}</div>
+              <div className={styles.inner}>{def?.emoji ?? "📍"}</div>
             </div>
-            <div className="hm-pin-tail" />
+            <div className={styles.tail} />
           </div>
         );
       })}

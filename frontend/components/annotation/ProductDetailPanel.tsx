@@ -3,7 +3,9 @@
 import { type Annotation } from "@/store/annotationStore";
 import { type ProductDetail } from "@/hooks/useProducts";
 import { useResolveAnnotation, useReopenAnnotation } from "@/hooks/useAnnotations";
-import { OBJECT_DEFS } from  "@/components/workspace/FanEmojiMenu";
+import { OBJECT_DEFS } from "@/components/workspace/FanEmojiMenu";
+import styles from "./ProductDetailPanel.module.css";
+import closeBtnStyles from "@/components/shared/CloseBtn.module.css";
 
 interface Props {
   product: ProductDetail;
@@ -21,61 +23,59 @@ export function ProductDetailPanel({ product, annotation, imageId, canResolve, o
   const def = annotation ? OBJECT_DEFS[annotation.object_id] : null;
 
   return (
-    <div className="hm-pdp-wrap">
-      {/* Header */}
-      <div className="hm-pdp-header">
-        <button onClick={onClose} className="hm-close-btn">←</button>
-        <div className="hm-pdp-title">{product.name}</div>
+    <div className={styles.wrap}>
+      <div className={styles.header}>
+        <button onClick={onClose} className={closeBtnStyles.closeBtn}>←</button>
+        <div className={styles.title}>{product.name}</div>
       </div>
 
-      {/* Thumbnail */}
       {product.thumbnail_url && (
-        <div className="hm-pdp-thumb-wrap">
-          <img src={product.thumbnail_url} alt={product.name} className="hm-pdp-thumb" />
+        <div className={styles.thumbWrap}>
+          <img src={product.thumbnail_url} alt={product.name} className={styles.thumb} />
         </div>
       )}
 
-      <div className="hm-pdp-body">
-        <div className="hm-pdp-name">{product.name}</div>
+      <div className={styles.body}>
+        <div className={styles.name}>{product.name}</div>
 
         {product.brand && (
-          <div className="hm-pdp-brand">
+          <div className={styles.brand}>
             {product.brand}{product.model ? ` · ${product.model}` : ""}
           </div>
         )}
 
         {product.price != null && (
-          <div className="hm-pdp-price">
+          <div className={styles.price}>
             ฿{product.price.toLocaleString("th-TH")} {product.currency}
           </div>
         )}
 
         {product.description && (
-          <div className="hm-pdp-desc">{product.description}</div>
+          <div className={styles.desc}>{product.description}</div>
         )}
 
         {product.specs && Object.keys(product.specs).length > 0 && (
-          <div className="hm-pdp-specs">
-            <div className="hm-pdp-specs-label">Specifications</div>
+          <div className={styles.specs}>
+            <div className={styles.specsLabel}>Specifications</div>
             {Object.entries(product.specs).map(([k, v]) => (
-              <div key={k} className="hm-pdp-spec-row">
-                <span className="hm-pdp-spec-key">{k}</span>
-                <span className="hm-pdp-spec-val">{String(v)}</span>
+              <div key={k} className={styles.specRow}>
+                <span className={styles.specKey}>{k}</span>
+                <span className={styles.specVal}>{String(v)}</span>
               </div>
             ))}
           </div>
         )}
 
         {annotation && def && (
-          <div className="hm-pdp-pin-box">
-            <div className="hm-pdp-pin-label">Pinned at</div>
-            <div className="hm-pdp-pin-row">
-              <span className="hm-pdp-pin-emoji">{def.emoji}</span>
+          <div className={styles.pinBox}>
+            <div className={styles.pinLabel}>Pinned at</div>
+            <div className={styles.pinRow}>
+              <span className={styles.pinEmoji}>{def.emoji}</span>
               <div>
-                <div className="hm-pdp-pin-name">{def.label}</div>
-                <div className="hm-pdp-pin-meta">
+                <div className={styles.pinName}>{def.label}</div>
+                <div className={styles.pinMeta}>
                   {Math.round(annotation.position_x * 100)}%, {Math.round(annotation.position_y * 100)}%
-                  {isResolved && <span className="hm-pdp-resolved-tag">✓ Resolved</span>}
+                  {isResolved && <span className={styles.resolvedTag}>✓ Resolved</span>}
                 </div>
               </div>
             </div>
@@ -86,7 +86,7 @@ export function ProductDetailPanel({ product, annotation, imageId, canResolve, o
           <div>
             {isResolved ? (
               <button
-                className="hm-pdp-reopen-btn"
+                className={styles.reopenBtn}
                 onClick={() => reopenMutation.mutate(annotation.id)}
                 disabled={isBusy}
               >
@@ -94,7 +94,7 @@ export function ProductDetailPanel({ product, annotation, imageId, canResolve, o
               </button>
             ) : (
               <button
-                className="hm-pdp-resolve-btn"
+                className={styles.resolveBtn}
                 onClick={() => resolveMutation.mutate(annotation.id)}
                 disabled={isBusy}
               >

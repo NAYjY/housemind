@@ -12,6 +12,7 @@
  */
 
 import { Component, type ReactNode, type ErrorInfo } from "react";
+import styles from "./WorkspaceErrorBoundary.module.css";
 
 interface Props {
   children: ReactNode;
@@ -55,28 +56,28 @@ export class WorkspaceErrorBoundary extends Component<Props, State> {
 
 function WorkspaceErrorFallback({ onReset }: { onReset: () => void }) {
   return (
-    <div className="hm-error-wrap">
-      <div className="hm-error-wordmark">
+    <div className={styles.wrap}>
+      <div className={styles.wordmark}>
         House<span>Mind</span>
       </div>
 
-      <div className="hm-error-icon">⚠️</div>
+      <div className={styles.icon}>⚠️</div>
 
-      <div className="hm-error-title">เกิดข้อผิดพลาด</div>
-      <div className="hm-error-subtitle">
+      <div className={styles.title}>เกิดข้อผิดพลาด</div>
+      <div className={styles.subtitle}>
         Something went wrong in the workspace.
       </div>
-      <div className="hm-error-body">
+      <div className={styles.body}>
         ข้อมูลของคุณปลอดภัย — กรุณาลองใหม่อีกครั้ง
         <br />
         <small>Your data is safe. Please try again.</small>
       </div>
 
-      <button onClick={onReset} className="hm-error-btn-primary">
+      <button onClick={onReset} className={styles.btnPrimary}>
         ลองใหม่ · Try again
       </button>
 
-      <button onClick={() => window.location.reload()} className="hm-error-btn-secondary">
+      <button onClick={() => window.location.reload()} className={styles.btnSecondary}>
         โหลดหน้าใหม่ · Reload page
       </button>
     </div>

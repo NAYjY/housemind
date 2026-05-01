@@ -1,0 +1,5 @@
+.pin { position:absolute; transform:translate(-50%,-100%); z-index:15; cursor:pointer; }
+.bubble { width:32px; height:32px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 3px 12px rgba(0,0,0,0.25); font-size:11px; font-weight:600; color:#fff; transition:width 0.15s, height 0.15s; }
+.bubble.active { width:38px; height:38px; }
+.inner { transform:rotate(45deg); }
+.tail { width:2px; height:7px; background:rgba(255,255,255,0.75); margin:-1px auto 0; }

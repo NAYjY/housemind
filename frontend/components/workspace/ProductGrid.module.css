@@ -1,0 +1,15 @@
+.sectionHeader { padding:16px 20px 0; display:flex; align-items:center; justify-content:space-between; background:#FAFAF8; }
+.sectionTitle { font-family:'DM Serif Display',serif; font-size:17px; color:#1A1A18; }
+.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:12px 20px 80px; background:#FAFAF8; }
+.card { background:#fff; border:0.5px solid #E8E6E0; border-radius:12px; padding:10px; cursor:pointer; position:relative; transition:border-color 0.18s; }
+.card:hover { border-color:#7F77DD; }
+.img { width:100%; aspect-ratio:1/1; border-radius:8px; background:#F5F4F0; margin-bottom:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+.letter { font-family:'DM Serif Display',serif; font-size:28px; color:#D4D1C7; }
+.prodTitle { font-size:12px; font-weight:500; color:#1A1A18; line-height:1.3; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tag { font-size:10px; color:#534AB7; font-weight:500; margin-bottom:2px; }
+.contact { font-size:10px; color:#888780; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.attachBtn { font-size:11px; color:#fff; background:#8B6520; border:none; border-radius:8px; padding:5px 10px; cursor:pointer; font-weight:500; font-family:inherit; }
+.toggleBtn { font-size:11px; color:var(--color-accent,#8B6520); background:none; border:none; cursor:pointer; font-family:inherit; }
+.unlinkBtn { position:absolute; top:6px; right:6px; z-index:10; width:20px; height:20px; border-radius:50%; background:rgba(226,75,74,0.9); border:none; color:#fff; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; transition:opacity 0.15s; }
+.unlinkBtn:disabled { opacity:0.5; }
+.empty { padding:40px 20px; text-align:center; color:#888; font-size:13px; }

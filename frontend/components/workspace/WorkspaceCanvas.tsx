@@ -5,6 +5,7 @@ import type { Annotation } from "@/store/annotationStore";
 import { PinsLayer } from "./PinsLayer";
 import { FilmStrip } from "./FilmStrip";
 import type { Slide } from "@/hooks/useSlides";
+import styles from "./WorkspaceCanvas.module.css";
 
 interface WorkspaceCanvasProps {
   activeSlide: Slide;
@@ -109,10 +110,10 @@ export function WorkspaceCanvas({
   };
 
   return (
-    <div className="hm-canvas-wrap">
+    <div className={styles.wrap}>
       {activeSlide.url && (
         <img
-          className="hm-canvas-img"
+          className={styles.img}
           src={activeSlide.url}
           alt={activeSlide.label}
           onError={onImageError}
@@ -121,7 +122,7 @@ export function WorkspaceCanvas({
 
       <div
         ref={canvasRef}
-        className="hm-canvas-tap"
+        className={styles.tap}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerMove={handlePointerMove}
@@ -129,7 +130,7 @@ export function WorkspaceCanvas({
       />
 
       {annotations.length === 0 && canAnnotate && (
-        <div className="hm-canvas-hint">
+        <div className={styles.hint}>
           {isAuthenticated ? "Hold to annotate" : "Sign in to annotate"}
         </div>
       )}
@@ -143,21 +144,21 @@ export function WorkspaceCanvas({
       />
 
       {isCreating && (
-        <div className="hm-creating">
+        <div className={styles.creating}>
           <div className="spinner" />
         </div>
       )}
 
       {showMultipleSlides && (
-        <div className="hm-carousel-nav">
+        <div className={styles.carouselNav}>
           <button
-            className="hm-c-btn"
+            className={styles.carouselBtn}
             onClick={onSlidePrev}
           >
             ‹
           </button>
           <button
-            className="hm-c-btn"
+            className={styles.carouselBtn}
             onClick={onSlideNext}
           >
             ›

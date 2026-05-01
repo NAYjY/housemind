@@ -1,6 +1,8 @@
 // components/workspace/FanEmojiMenu.tsx
 "use client";
 
+import styles from "./FanEmojiMenu.module.css";
+
 export const OBJECT_DEFS: Record<number, { emoji: string; label: string }> = {
   101: { emoji: "😊", label: "Smile" },
   102: { emoji: "⭐", label: "Star" },
@@ -27,9 +29,9 @@ export function FanEmojiMenu({ pos, onPick, onClose }: Props) {
 
   return (
   <>
-    <div className="hm-fan-overlay" onClick={onClose} />
+    <div className={styles.overlay} onClick={onClose} />
     <div
-      className="hm-fan-root"
+      className={styles.root}
       style={{ left: pos.x, top: pos.y }}
     >
       {OBJECT_IDS.map((objectId, i) => {
@@ -43,14 +45,14 @@ export function FanEmojiMenu({ pos, onPick, onClose }: Props) {
             key={objectId}
             onClick={() => onPick(objectId)}
             title={def.label}
-            className="hm-fan-btn"
+            className={styles.btn}
             style={{ left: x, top: y }}
           >
             {def.emoji}
           </button>
         );
       })}
-      <div className="hm-fan-dot" />
+      <div className={styles.dot} />
     </div>
   </>
 );
