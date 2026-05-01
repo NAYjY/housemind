@@ -4,6 +4,12 @@ app/api/v1/projects.py — HouseMind
 SEC-04 fix: when an architect creates a project (top-level or sub-project),
 they are automatically added to project_members.  Without this, the architect
 would fail their own require_project_member check on subsequent reads.
+
+BUG FIX: list_projects now returns top-level member projects for non-architect
+roles (contractor, homeowner, supplier).  Previously it returned an empty list,
+leaving contractors/homeowners with a blank profile page and no way to access
+their projects.  The fix queries project_members and filters to parent_project_id
+IS NULL so subprojects never appear in the profile list.
 """
 from __future__ import annotations
 
@@ -37,7 +43,6 @@ async def _add_architect_as_member(
     db.add(member)
 
 
-
 # ── GET /projects ──────────────────────────────────────────────────────────────
 
 @router.get("", response_model=list[ProjectListItem])
@@ -45,14 +50,15 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ) -> list[ProjectListItem]:
-    if user["role"] != "architect":
-        return []
     result = await db.execute(
-        select(Project).where(
-            Project.architect_id == uuid.UUID(user["user_id"]),
+        select(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .where(
+            ProjectMember.user_id == uuid.UUID(user["user_id"]),
             Project.parent_project_id.is_(None),
             Project.status != "archived",
-        ).order_by(Project.created_at.desc())
+        )
+        .order_by(Project.created_at.desc())
     )
     return list(result.scalars().all())
 
@@ -211,7 +217,7 @@ async def archive_project(
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
-    
+
 # ── DELETE /projects/{project_id} ─────────────────────────────────────────────
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
