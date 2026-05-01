@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 import { HydrationBoundary } from "@/app/providers";
 import { prefetchWorkspace } from "@/lib/prefetch";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
+import { WorkspaceErrorBoundary } from "@/components/workspace/WorkspaceErrorBoundary";
 
 interface Props {
   params: Promise<{ projectId: string; imageId: string }>;
@@ -30,13 +31,15 @@ export default async function WorkspacePage({ params, searchParams }: Props) {
   const { dehydratedState } = await prefetchWorkspace(projectId, imageId, token);
 
   return (
-    <HydrationBoundary state={dehydratedState}>
-      <WorkspaceShell
-        imageId={imageId}
-        imageUrl={imageUrl}
-        projectId={projectId}
-        forceReadOnly={forceReadOnly}
-      />
-    </HydrationBoundary>
+    <WorkspaceErrorBoundary>
+      <HydrationBoundary state={dehydratedState}>
+        <WorkspaceShell
+          imageId={imageId}
+          imageUrl={imageUrl}
+          projectId={projectId}
+          forceReadOnly={forceReadOnly}
+        />
+      </HydrationBoundary>
+    </WorkspaceErrorBoundary>
   );
 }
