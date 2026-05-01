@@ -24,6 +24,10 @@ from app.config import settings
 PREFIX_PRODUCT_THUMBNAILS = "products/thumbnails/"
 PREFIX_PROJECT_IMAGES = "projects/"
 
+_ALLOWED_PREFIXES = (
+    PREFIX_PRODUCT_THUMBNAILS,
+    PREFIX_PROJECT_IMAGES,
+)
 _ALLOWED_EXTENSIONS = frozenset({
     "jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "heif",
 })
@@ -32,6 +36,10 @@ _SAFE_EXT_RE = re.compile(r"^[a-z0-9]{1,10}$")
 _LOCAL_UPLOAD_DIR = Path("/app/uploads")
 _IS_LOCAL = lambda: _os.getenv("ENVIRONMENT", "local") in ("local", "test")
 
+def _validate_s3_key(key: str) -> None:
+    """Reject keys that don't belong to a known prefix — prevents cross-tenant presign."""
+    if not any(key.startswith(p) for p in _ALLOWED_PREFIXES):
+        raise ValueError(f"Unauthorized S3 key: {key!r}")
 
 def _sanitize_extension(raw_ext: str) -> str:
     ext = raw_ext.lstrip(".").lower()
@@ -82,6 +90,9 @@ def _local_upload_path(s3_key: str) -> Path:
 def presign_product_thumbnail(s3_key: str) -> str:
     if s3_key.startswith("http://") or s3_key.startswith("https://"):
         return s3_key
+    if not s3_key:
+        return ""
+    _validate_s3_key(s3_key)
     if _IS_LOCAL():
         p = _local_upload_path(s3_key)
         if p.exists():
@@ -93,6 +104,10 @@ def presign_product_thumbnail(s3_key: str) -> str:
 def presign_project_image(s3_key: str) -> str:
     if s3_key.startswith("http://") or s3_key.startswith("https://"):
         return s3_key
+    if not s3_key:
+        return ""
+    _validate_s3_key(s3_key)
+
     if _IS_LOCAL():
         p = _local_upload_path(s3_key)
         if p.exists():

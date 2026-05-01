@@ -99,7 +99,7 @@ async def _presign_product(p: Product) -> ProductDetail:
     try:
         url = await presign_product_thumbnail_async(p.thumbnail_s3_key)
     except RuntimeError:
-        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key)
+        logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key, error=str(exc))
         url = ""
     return ProductDetail(
         id=p.id,
