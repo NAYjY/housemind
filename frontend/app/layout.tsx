@@ -1,10 +1,7 @@
-// app/layout.tsx
-// BLK-14 fix: Noto Sans Thai added via next/font/google
-// lang attribute is "th" — primary audience is Thai users; English falls back gracefully
-
 import type { Metadata } from "next";
 import { Noto_Sans, Noto_Sans_Thai } from "next/font/google";
 import { Providers } from "./providers";
+import { cookies } from "next/headers";
 import "./globals.css";
 
 const notoSansThai = Noto_Sans_Thai({
@@ -26,13 +23,18 @@ export const metadata: Metadata = {
   description: "The shared workspace for building decisions",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = cookies();
+  const locale = cookieStore.get("hm_locale")?.value ?? "th";
+  const supported = ["th", "en"];
+  const resolvedLocale = supported.includes(locale) ? locale : "th";
+
   return (
-    <html lang="th" className={`${notoSansThai.variable} ${notoSans.variable}`}>
+    <html lang={resolvedLocale} className={`${notoSansThai.variable} ${notoSans.variable}`}>
       <body>
         <Providers>{children}</Providers>
       </body>
