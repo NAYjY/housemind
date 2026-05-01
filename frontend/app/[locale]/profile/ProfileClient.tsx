@@ -108,42 +108,40 @@ function CreateProjectModal({ onClose, onCreate }: CreateModalProps) {
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(28,24,16,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      className="hm-create-modal-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: "#FBF8F3", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 430, padding: "24px 24px 40px", animation: "hm-slide-up 0.22s cubic-bezier(0.32,0.72,0,1)" }}>
-        <div style={{ width: 36, height: 3, borderRadius: 2, background: "#E0D8CC", margin: "0 auto 24px" }} />
-        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1C1810", marginBottom: 4 }}>สร้างโครงการใหม่</div>
-        <div style={{ fontSize: 12, color: "#B0A090", marginBottom: 24 }}>New Project</div>
+      <div className="hm-create-modal-sheet">
+        <div className="hm-create-modal-handle" />
+        <div className="hm-create-modal-title">สร้างโครงการใหม่</div>
+        <div className="hm-create-modal-sub">New Project</div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C49A3C", marginBottom: 6 }}>ชื่อโครงการ *</div>
+          <div className="hm-create-modal-label">ชื่อโครงการ *</div>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="เช่น บ้านพักอาศัย สุขุมวิท 101"
             autoFocus
-            style={{ width: "100%", height: 44, border: "1px solid #E0D8CC", borderRadius: 12, padding: "0 14px", fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none", color: "#1C1810", boxSizing: "border-box", marginBottom: 16 }}
+            className="hm-create-modal-input"
           />
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C49A3C", marginBottom: 6 }}>รายละเอียด (optional)</div>
+          <div className="hm-create-modal-label">รายละเอียด (optional)</div>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="รายละเอียดโครงการ..."
             rows={3}
-            style={{ width: "100%", border: "1px solid #E0D8CC", borderRadius: 12, padding: "12px 14px", fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none", color: "#1C1810", resize: "none", lineHeight: 1.6, boxSizing: "border-box", marginBottom: 20 }}
+            className="hm-create-modal-textarea"
           />
-          {error && <div style={{ fontSize: 12, color: "#E24B4A", background: "#FEF2F2", border: "0.5px solid #FECACA", borderRadius: 8, padding: "8px 12px", marginBottom: 16 }}>{error}</div>}
-          <div style={{ display: "flex", gap: 10 }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, height: 46, background: "#fff", border: "1px solid #E0D8CC", borderRadius: 100, fontSize: 13, color: "#9A8870", cursor: "pointer", fontFamily: "inherit" }}>ยกเลิก</button>
-            <button type="submit" disabled={loading || !name.trim()} style={{ flex: 2, height: 46, background: loading || !name.trim() ? "#E0D8CC" : "#1C1810", border: "none", borderRadius: 100, fontSize: 13, fontWeight: 500, color: loading || !name.trim() ? "#9A8870" : "#FBF8F3", cursor: loading || !name.trim() ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+          {error && <div className="hm-create-modal-error">{error}</div>}
+          <div className="hm-create-modal-actions">
+            <button type="button" onClick={onClose} className="hm-create-modal-cancel">ยกเลิก</button>
+            <button type="submit" disabled={loading || !name.trim()} className="hm-create-modal-submit">
               {loading ? "กำลังสร้าง…" : "สร้างโครงการ"}
             </button>
           </div>

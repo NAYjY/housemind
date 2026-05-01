@@ -51,20 +51,12 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
   const [formError, setFormError] = useState("");
 
   const { data: currentProject } = useProjectDetail(projectId);
-  const parentId = isShell
-    ? projectId
-    : (currentProject?.parent_project_id ?? null);
-
-  const { data: parentDetail, refetch: refetchParent } = useProjectDetail(
-    parentId ?? ""
-  );
-
+  const parentId = isShell ? projectId : (currentProject?.parent_project_id ?? null);
+  const { data: parentDetail, refetch: refetchParent } = useProjectDetail(parentId ?? "");
   const createSub = useCreateSubProject(parentId ?? "");
   const subprojects = parentDetail?.subprojects ?? [];
   const parentName = parentDetail?.name ?? "";
-  const currentLabel = isShell
-    ? (parentDetail?.name ?? "…")
-    : (currentProject?.name ?? "…");
+  const currentLabel = isShell ? (parentDetail?.name ?? "…") : (currentProject?.name ?? "…");
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -77,39 +69,22 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
         description: newDesc.trim() || undefined,
       });
       await refetchParent();
-      setNewName("");
-      setNewDesc("");
-      setShowAddForm(false);
-      setOpen(false);
+      setNewName(""); setNewDesc(""); setShowAddForm(false); setOpen(false);
       router.push(`/th/workspace/${created.id}/${created.id}`);
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Failed to create");
-    } finally {
-      setCreating(false);
-    }
+    } finally { setCreating(false); }
   }
 
   return (
     <div style={{ position: "relative" }}>
       <button
         onClick={() => { setOpen((v) => !v); setShowAddForm(false); }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: "2px 0",
-        }}
+        className="hm-subnav-trigger"
       >
         <div>
-          {!isShell && (
-            <div style={{ fontSize: 10, color: "#888780", letterSpacing: "0.06em", textAlign: "left" }}>
-              {parentName}
-            </div>
-          )}
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A18", display: "flex", alignItems: "center", gap: 4 }}>
+          {!isShell && <div className="hm-subnav-parent-label">{parentName}</div>}
+          <div className="hm-subnav-current-label">
             {currentLabel}
             <svg
               width="10" height="6" viewBox="0 0 10 6" fill="none"
@@ -123,39 +98,12 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
 
       {open && (
         <>
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 48 }}
-            onClick={() => { setOpen(false); setShowAddForm(false); }}
-          />
-          <div style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            left: 0,
-            zIndex: 49,
-            background: "#fff",
-            border: "0.5px solid #E8E6E0",
-            borderRadius: 14,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-            minWidth: 220,
-            maxWidth: 280,
-            overflow: "hidden",
-          }}>
-            <div style={{
-              padding: "10px 14px 6px",
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: "#B0A090",
-              borderBottom: "0.5px solid #F5F4F0",
-            }}>
-              {parentName} · โครงการย่อย
-            </div>
+          <div className="hm-subnav-backdrop" onClick={() => { setOpen(false); setShowAddForm(false); }} />
+          <div className="hm-subnav-dropdown">
+            <div className="hm-subnav-dropdown-header">{parentName} · โครงการย่อย</div>
 
             {subprojects.length === 0 && (
-              <div style={{ padding: "12px 14px", fontSize: 12, color: "#B0A090" }}>
-                ยังไม่มีโครงการย่อย
-              </div>
+              <div className="hm-subnav-empty">ยังไม่มีโครงการย่อย</div>
             )}
 
             {subprojects.map((sub) => {
@@ -163,134 +111,51 @@ function SubprojectNav({ projectId, isShell }: SubprojectNavProps) {
               return (
                 <button
                   key={sub.id}
-                  onClick={() => {
-                    setOpen(false);
-                    if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`);
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 14px",
-                    background: isCurrent ? "#F5EDD8" : "transparent",
-                    border: "none",
-                    borderBottom: "0.5px solid #F5F4F0",
-                    cursor: isCurrent ? "default" : "pointer",
-                    textAlign: "left",
-                    fontFamily: "inherit",
-                  }}
+                  onClick={() => { setOpen(false); if (!isCurrent) router.push(`/th/workspace/${sub.id}/${sub.id}`); }}
+                  className={`hm-subnav-item ${isCurrent ? "active" : ""}`}
                 >
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    background: isCurrent ? "#C49A3C" : "#F5F4F0",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 700,
-                    color: isCurrent ? "#fff" : "#888780",
-                    flexShrink: 0,
-                  }}>
+                  <div className="hm-subnav-item-icon">
                     {sub.name[0]?.toUpperCase() ?? "S"}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: isCurrent ? 600 : 400,
-                      color: isCurrent ? "#8B6520" : "#1A1A18",
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    }}>
-                      {sub.name}
-                    </div>
-                  </div>
-                  {isCurrent && (
-                    <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>
-                  )}
+                  <div className="hm-subnav-item-name">{sub.name}</div>
+                  {isCurrent && <span style={{ fontSize: 11, color: "#C49A3C", flexShrink: 0 }}>✓</span>}
                 </button>
               );
             })}
 
             {!showAddForm ? (
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 14px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontFamily: "inherit",
-                  color: "#8B6520",
-                  fontSize: 13,
-                  fontWeight: 500,
-                }}
-              >
-                <span style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  background: "#FEF3DC", border: "1px dashed #C49A3C",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 16, color: "#C49A3C", flexShrink: 0,
-                }}>+</span>
+              <button onClick={() => setShowAddForm(true)} className="hm-subnav-add-btn">
+                <span className="hm-subnav-add-icon">+</span>
                 เพิ่มโครงการย่อย
               </button>
             ) : (
-              <form onSubmit={handleCreate} style={{ padding: "10px 14px 12px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#C49A3C", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                  ชื่อโครงการย่อย *
-                </div>
+              <form onSubmit={handleCreate} className="hm-subnav-form">
+                <div className="hm-subnav-form-label">ชื่อโครงการย่อย *</div>
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="เช่น ห้องนอน, ห้องน้ำ"
-                  style={{
-                    width: "100%", height: 36,
-                    border: "0.5px solid #E8E6E0", borderRadius: 8,
-                    padding: "0 10px", fontSize: 12,
-                    fontFamily: "inherit", outline: "none",
-                    background: "#fff", color: "#1A1A18",
-                    boxSizing: "border-box", marginBottom: 6,
-                  }}
+                  className="hm-subnav-form-input"
                 />
                 <input
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="รายละเอียด (optional)"
-                  style={{
-                    width: "100%", height: 36,
-                    border: "0.5px solid #E8E6E0", borderRadius: 8,
-                    padding: "0 10px", fontSize: 12,
-                    fontFamily: "inherit", outline: "none",
-                    background: "#fff", color: "#1A1A18",
-                    boxSizing: "border-box", marginBottom: 8,
-                  }}
+                  className="hm-subnav-form-input"
                 />
-                {formError && (
-                  <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{formError}</div>
-                )}
-                <div style={{ display: "flex", gap: 6 }}>
+                {formError && <div className="hm-subnav-form-error">{formError}</div>}
+                <div className="hm-subnav-form-actions">
                   <button
                     type="button"
                     onClick={() => { setShowAddForm(false); setNewName(""); setNewDesc(""); setFormError(""); }}
-                    style={{ flex: 1, height: 32, background: "#F5F4F0", border: "none", borderRadius: 8, fontSize: 11, color: "#888", cursor: "pointer", fontFamily: "inherit" }}
-                  >
-                    ยกเลิก
-                  </button>
+                    className="hm-subnav-form-cancel"
+                  >ยกเลิก</button>
                   <button
                     type="submit"
                     disabled={creating || !newName.trim()}
-                    style={{
-                      flex: 2, height: 32,
-                      background: creating || !newName.trim() ? "#E8E6E0" : "#1A1A18",
-                      border: "none", borderRadius: 8, fontSize: 11,
-                      fontWeight: 600, color: creating || !newName.trim() ? "#aaa" : "#fff",
-                      cursor: creating || !newName.trim() ? "not-allowed" : "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {creating ? "กำลังสร้าง…" : "สร้าง"}
-                  </button>
+                    className="hm-subnav-form-submit"
+                  >{creating ? "กำลังสร้าง…" : "สร้าง"}</button>
                 </div>
               </form>
             )}
@@ -320,25 +185,10 @@ function ShellView({ projectId }: { projectId: string }) {
         <SubprojectNav projectId={projectId} isShell={true} />
       </div>
 
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "60px 24px",
-        textAlign: "center",
-        color: "#B0A090",
-      }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🏗️</div>
-        <div style={{
-          fontFamily: "'DM Serif Display', serif",
-          fontSize: 18,
-          color: "#1A1A18",
-          marginBottom: 8,
-        }}>
-          เลือกโครงการย่อย
-        </div>
-        <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+      <div className="hm-shell-empty">
+        <div className="hm-shell-empty-icon">🏗️</div>
+        <div className="hm-shell-empty-title">เลือกโครงการย่อย</div>
+        <div className="hm-shell-empty-desc">
           กดชื่อโครงการด้านบนเพื่อเลือกหรือเพิ่มโครงการย่อย
         </div>
       </div>

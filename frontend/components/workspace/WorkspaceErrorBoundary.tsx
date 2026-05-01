@@ -55,110 +55,28 @@ export class WorkspaceErrorBoundary extends Component<Props, State> {
 
 function WorkspaceErrorFallback({ onReset }: { onReset: () => void }) {
   return (
-    <div
-      style={{
-        fontFamily: "'DM Sans', 'Sarabun', sans-serif",
-        background: "#FAF8F4",
-        minHeight: "100vh",
-        maxWidth: 430,
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 28px",
-        textAlign: "center",
-      }}
-    >
-      {/* HouseMind wordmark */}
-      <div
-        style={{
-          fontFamily: "'DM Serif Display', serif",
-          fontSize: 20,
-          color: "#1C1810",
-          marginBottom: 32,
-          letterSpacing: "-0.01em",
-        }}
-      >
-        House<span style={{ color: "#C9A84C" }}>Mind</span>
+    <div className="hm-error-wrap">
+      <div className="hm-error-wordmark">
+        House<span>Mind</span>
       </div>
 
-      {/* Error icon */}
-      <div style={{ fontSize: 44, marginBottom: 20 }}>⚠️</div>
+      <div className="hm-error-icon">⚠️</div>
 
-      {/* Thai-primary messaging */}
-      <div
-        style={{
-          fontSize: 17,
-          fontWeight: 700,
-          color: "#1C1810",
-          marginBottom: 8,
-        }}
-      >
-        เกิดข้อผิดพลาด
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: "#9A8870",
-          marginBottom: 6,
-          lineHeight: 1.5,
-        }}
-      >
+      <div className="hm-error-title">เกิดข้อผิดพลาด</div>
+      <div className="hm-error-subtitle">
         Something went wrong in the workspace.
       </div>
-      <div
-        style={{
-          fontSize: 13,
-          color: "#6B5D4E",
-          marginBottom: 32,
-          lineHeight: 1.7,
-        }}
-      >
+      <div className="hm-error-body">
         ข้อมูลของคุณปลอดภัย — กรุณาลองใหม่อีกครั้ง
         <br />
-        <span style={{ fontSize: 11, color: "#B0A090" }}>
-          Your data is safe. Please try again.
-        </span>
+        <small>Your data is safe. Please try again.</small>
       </div>
 
-      {/* Try again — resets boundary state, no full page reload */}
-      <button
-        onClick={onReset}
-        style={{
-          width: "100%",
-          maxWidth: 280,
-          height: 48,
-          background: "#1C1810",
-          border: "none",
-          borderRadius: 100,
-          color: "#fff",
-          fontSize: 14,
-          fontWeight: 500,
-          cursor: "pointer",
-          marginBottom: 12,
-          fontFamily: "inherit",
-        }}
-      >
+      <button onClick={onReset} className="hm-error-btn-primary">
         ลองใหม่ · Try again
       </button>
 
-      {/* Hard reload fallback — last resort */}
-      <button
-        onClick={() => window.location.reload()}
-        style={{
-          width: "100%",
-          maxWidth: 280,
-          height: 44,
-          background: "transparent",
-          border: "1px solid #E0D8CC",
-          borderRadius: 100,
-          color: "#9A8870",
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >
+      <button onClick={() => window.location.reload()} className="hm-error-btn-secondary">
         โหลดหน้าใหม่ · Reload page
       </button>
     </div>
