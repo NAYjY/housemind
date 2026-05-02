@@ -124,7 +124,7 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
             <div className={styles.wordmark}>House<span>Mind</span></div>
             <div className={styles.heroSub}>Visual decisions workspace</div>
           </div>
-          <a href="/th/profile" style={{ textDecoration: "none" }}>
+          <a href="/${locale}/profile" style={{ textDecoration: "none" }}>
             <button className={styles.roleBadge}>{auth.role ?? "Sign in"}</button>
           </a>
         </div>
