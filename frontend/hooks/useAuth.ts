@@ -45,7 +45,10 @@ function buildState(
 
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>(() =>
-    buildState(null, async () => {})
+    {
+     if (typeof window !== "undefined") return buildState(getCurrentUser(), async () => {});
+     return buildState(null, async () => {});
+   }
   );
 
   useEffect(() => {
