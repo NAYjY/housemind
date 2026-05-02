@@ -115,14 +115,14 @@ export function useProductThumbnailUpload() {
   });
 }
 
-// useLinkProduct — FIX: project_id must be a query param so require_project_owner
+// useLinkProduct — FIX: project_id must be a query param so require_project_architect
 // can read it from request.query_params. Sending it only in the JSON body is
 // invisible to the FastAPI dependency.
 export function useLinkProduct(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ productId, objectId }: { productId: string; objectId: number }) => {
-      // ✅ project_id in query string (required by require_project_owner)
+      // ✅ project_id in query string (required by require_project_architect)
       const res = await authFetch(`${API}/products/link?project_id=${projectId}`, {
         method: "POST",
         body: JSON.stringify({
@@ -149,7 +149,7 @@ export function useUnlinkProduct(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (objectProductId: string) => {
-      // ✅ project_id in query string (required by require_project_owner)
+      // ✅ project_id in query string (required by require_project_architect)
       const res = await authFetch(
         `${API}/products/link/${objectProductId}?project_id=${projectId}`,
         { method: "DELETE" }

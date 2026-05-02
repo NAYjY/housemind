@@ -25,7 +25,7 @@ Auth flow:
   2. decode_token      — jwt.decode, hardcoded HS256
   3. get_current_user  — extract claims, check jti revocation (async, DB)
   4. role guards       — require_architect, require_architect_or_contractor
-  5. scope guards      — require_project_member, require_project_owner
+  5. scope guards      — require_project_member, require_project_architect
                          both take project_id: uuid.UUID = Query(...)
                          FastAPI resolves this from the calling endpoint's
                          query parameters, so no duplication is needed.
@@ -157,7 +157,7 @@ def require_project_member_role(user: dict = Depends(get_current_user)) -> dict:
     """
     Any authenticated user with a valid role.
     NOTE: this does NOT check project membership — pair with
-    require_project_member or require_project_owner for that.
+    require_project_member or require_project_architect for that.
     Used only on endpoints that have no project scope (e.g. product detail).
     """
     return user
@@ -258,7 +258,7 @@ async def require_annotation_project_member(
 
 # ── Project ownership check ────────────────────────────────────────────────────
 
-async def require_project_owner(
+async def require_project_architect(
     request: Request,
     user: dict = Depends(require_architect),
     db: AsyncSession = Depends(get_db),

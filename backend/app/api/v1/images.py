@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel as PydanticBase
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import require_project_member, require_project_owner
+from app.auth import require_project_member, require_project_architect
 from app.config import settings
 from app.db.queries import (
     get_active_image,
@@ -108,7 +108,7 @@ class UrlImageRequest(PydanticBase):
 async def create_image_from_url(
     body: UrlImageRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> ProjectImageResponse:
     image = ProjectImage(
         id=uuid.uuid4(),
@@ -141,7 +141,7 @@ async def create_image_from_url(
 async def get_upload_url(
     body: UploadPresignRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> UploadPresignResponse:
     ext = PurePosixPath(body.filename).suffix.lstrip(".").lower() or "jpg"
     image_id = uuid.uuid4()
@@ -161,7 +161,7 @@ async def get_upload_url(
 async def confirm_upload(
     body: UploadConfirmRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> ProjectImageResponse:
     image = ProjectImage(
         id=uuid.uuid4(),
@@ -197,7 +197,7 @@ async def delete_image(
     image_id: uuid.UUID,
     project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ):
     image = await soft_delete_image_in_project(db, image_id, project_id)
     if image is None:

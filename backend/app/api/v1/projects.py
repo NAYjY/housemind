@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, require_architect, require_project_owner
+from app.auth import get_current_user, require_architect, require_project_architect
 from app.db.session import get_db
 from app.models.project import Project
 from app.models.project_member import ProjectMember  # SEC-04
@@ -150,7 +150,7 @@ async def create_subproject(
     project_id: uuid.UUID,
     body: ProjectCreateRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> ProjectDetail:
     sub = Project(
         id=uuid.uuid4(),
@@ -186,7 +186,7 @@ async def create_subproject(
 async def archive_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> ProjectListItem:
     result = await db.execute(
         select(Project).where(
@@ -224,7 +224,7 @@ async def archive_project(
 async def delete_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_architect),
+    user: dict = Depends(require_project_architect)
 ) -> Response:
     """
     Delete a subproject (and cascade its images + annotations via DB CASCADE).

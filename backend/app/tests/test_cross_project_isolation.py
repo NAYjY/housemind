@@ -331,7 +331,7 @@ class TestImageCrossProjectIsolation:
     ) -> None:
         """
         Omitting project_id entirely must be rejected (422 validation error).
-        require_project_owner needs project_id to do the ownership check.
+        require_project_architect needs project_id to do the ownership check.
         """
         user_a, token_a = await _make_architect(db_session, "a-no-proj@test.com")
         project_a = await _make_project(db_session, user_a.id)

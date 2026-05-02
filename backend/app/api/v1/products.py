@@ -5,7 +5,7 @@ Product CRUD + search + scrape + object_products linking.
 Security fixes:
 
 SEC-01  IDOR on object_products — DELETE and POST /products/link now use
-        require_project_owner so only the project architect can link/unlink
+        require_project_architect so only the project architect can link/unlink
         products.  Previously require_project_member (a no-op) allowed ANY
         authenticated user to delete product links from any project.
 
@@ -42,7 +42,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, require_architect, require_project_member, require_project_owner
+from app.auth import get_current_user, require_architect, require_project_member, require_project_architect
 from app.core.logging import get_logger  # SEC-08: was missing
 from app.db.session import get_db
 from app.models.object_product import ObjectProduct
@@ -98,7 +98,7 @@ def _can_create_product(user: dict) -> bool:
 async def _presign_product(p: Product) -> ProductDetail:
     try:
         url = await presign_product_thumbnail_async(p.thumbnail_s3_key)
-    except RuntimeError:
+    except RuntimeError as exc:
         logger.warning("presign.failed", product_id=str(p.id), key=p.thumbnail_s3_key, error=str(exc))
         url = ""
     return ProductDetail(
@@ -332,10 +332,10 @@ async def list_project_products(
 async def link_product_to_project(
     body: ObjectProductCreate,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),  # SEC-01: was require_project_member
+    user: dict = Depends(require_project_architect),  # SEC-01: was require_project_member
 ) -> ObjectProductResponse:
     """
-    SEC-01 fix: require_project_owner enforces that only the project architect
+    SEC-01 fix: require_project_architect enforces that only the project architect
     can link products.  Previously require_project_member was a no-op.
     """
     existing = await db.execute(
@@ -377,10 +377,10 @@ async def unlink_product_from_project(
     object_product_id: uuid.UUID,
     project_id: uuid.UUID = Query(...),  # SEC-01: required for ownership check
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),  # SEC-01: was require_project_member
+    user: dict = Depends(require_project_architect),  # SEC-01: was require_project_member
 ) -> Response:
     """
-    SEC-01 fix: project_id query param added so require_project_owner can
+    SEC-01 fix: project_id query param added so require_project_architect can
     verify ownership.  The query also asserts object_product.project_id
     matches — prevents deleting a link from a different project even if the
     caller owns some project.
@@ -406,7 +406,7 @@ async def unlink_product_by_product_id(
     product_id: uuid.UUID = Query(...),
     object_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> Response:
     """Unlink a product from a project object by product_id + object_id."""
     result = await db.execute(
@@ -513,7 +513,7 @@ async def get_product(
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return _presign_product(product)
+    return await _presign_product(product)
 
 # ── DELETE /products/{product_id} ─────────────────────────────────────────────
 

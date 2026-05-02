@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import (
     require_annotation_project_member,
     require_architect_or_contractor,
-    require_project_owner,
+    require_project_architect,
 )
 from app.db.queries import (
     get_active_annotation,
@@ -89,7 +89,7 @@ async def create_annotation(
     body: CreateAnnotationRequest,
     project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> AnnotationSummary:
     image = await get_active_image_in_project(db, body.image_id, project_id)
     if image is None:
@@ -121,7 +121,7 @@ async def move_annotation(
     body: AnnotationUpdateRequest,
     project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ) -> AnnotationSummary:
     ann = await get_active_annotation_in_project(db, annotation_id, project_id)
     if ann is None:
@@ -142,7 +142,7 @@ async def delete_annotation(
     annotation_id: uuid.UUID,
     project_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_project_owner),
+    user: dict = Depends(require_project_architect),
 ):
     ann = await soft_delete_annotation_in_project(db, annotation_id, project_id)
     if ann is None:
