@@ -2,13 +2,13 @@
 
 /**
  * app/[locale]/auth/register/page.tsx — HouseMind
- * Self-registration (architects primarily).
- * Mirrors login page style.
+ * Self-registration (architects primarily). Mirrors login page style.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { storeSession, setLocale } from "@/lib/auth";
+import styles from "../../login/Login.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -16,14 +16,12 @@ const ROLES = [
   { value: "architect",  label: "สถาปนิก",       desc: "Create & manage projects" },
   { value: "contractor", label: "ผู้รับเหมา",     desc: "View & resolve issues"    },
   { value: "supplier",   label: "ผู้จัดจำหน่าย", desc: "Manage product catalogue" },
-  // homeowner is invite-only — they don't self-register
 ] as const;
 
 type Role = typeof ROLES[number]["value"];
 
 export default function RegisterPage() {
   const router = useRouter();
-
   const [email,    setEmail]    = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -40,25 +38,17 @@ export default function RegisterPage() {
     }
     setLoading(true);
     setError("");
-
     try {
       const res = await fetch(`${API}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          email:     email.trim(),
-          password,
-          full_name: fullName.trim(),
-          role,
-        }),
+        body: JSON.stringify({ email: email.trim(), password, full_name: fullName.trim(), role }),
       });
-
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail ?? `Error ${res.status}`);
       }
-
       const data = await res.json();
       storeSession({ access_token: data.access_token, role: data.role, user_id: data.user_id });
       setLocale("th");
@@ -66,27 +56,23 @@ export default function RegisterPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
-      setLoading(false);
-    }
+      setLoading(false); }
   }
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        {/* Header */}
-        <div className="login-header">
-          <div className="login-wordmark">House<span>Mind</span></div>
-          <div className="login-sub">สร้างบัญชีใหม่ · Create your account</div>
+    <div className={styles.loginWrap}>
+      <div className={styles.loginCard}>
+        <div className={styles.loginHeader}>
+          <div className={styles.loginWordmark}>House<span>Mind</span></div>
+          <div className={styles.loginSub}>สร้างบัญชีใหม่ · Create your account</div>
         </div>
 
-        {/* Body */}
-        <div className="login-body">
+        <div className={styles.loginBody}>
           <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }}>
 
-            {/* Full name */}
-            <div className="login-label">Full name · ชื่อ-สกุล</div>
+            <div className={styles.loginLabel}>Full name · ชื่อ-สกุล</div>
             <input
-              className="login-input"
+              className={styles.loginInput}
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -95,10 +81,9 @@ export default function RegisterPage() {
               required
             />
 
-            {/* Email */}
-            <div className="login-label">Email</div>
+            <div className={styles.loginLabel}>Email</div>
             <input
-              className="login-input"
+              className={styles.loginInput}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -107,10 +92,9 @@ export default function RegisterPage() {
               required
             />
 
-            {/* Password */}
-            <div className="login-label">Password · รหัสผ่าน</div>
+            <div className={styles.loginLabel}>Password · รหัสผ่าน</div>
             <input
-              className="login-input"
+              className={styles.loginInput}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -119,10 +103,9 @@ export default function RegisterPage() {
               required
             />
 
-            {/* Confirm password */}
-            <div className="login-label">Confirm password · ยืนยันรหัสผ่าน</div>
+            <div className={styles.loginLabel}>Confirm password · ยืนยันรหัสผ่าน</div>
             <input
-              className="login-input"
+              className={styles.loginInput}
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
@@ -131,34 +114,32 @@ export default function RegisterPage() {
               required
             />
 
-            {/* Role selector */}
-            <div className="login-label" style={{ marginBottom: 8 }}>
+            <div className={styles.loginLabel} style={{ marginBottom: 8 }}>
               Role · บทบาทของคุณ
             </div>
-            <div className="role-grid" style={{ marginBottom: 20 }}>
+            <div className={styles.roleGrid}>
               {ROLES.map((r) => (
                 <button
                   key={r.value}
                   type="button"
-                  className={`role-btn ${role === r.value ? "selected" : ""}`}
+                  className={`${styles.roleBtn} ${role === r.value ? styles.selected : ""}`}
                   onClick={() => setRole(r.value)}
                 >
-                  <div className="role-btn-name">{r.label}</div>
-                  <div className="role-btn-desc">{r.desc}</div>
+                  <div className={styles.roleBtnName}>{r.label}</div>
+                  <div className={styles.roleBtnDesc}>{r.desc}</div>
                 </button>
               ))}
             </div>
 
-            {/* Password rules hint */}
             <div style={{ fontSize: 11, color: "var(--stone-500)", marginBottom: 12, lineHeight: 1.6 }}>
               รหัสผ่านต้องมี: 8+ ตัวอักษร · ตัวพิมพ์ใหญ่ · ตัวพิมพ์เล็ก · ตัวเลข<br />
               <span style={{ color: "var(--color-text-hint)" }}>Min 8 chars · uppercase · lowercase · number</span>
             </div>
 
-            {error && <div className="login-error">{error}</div>}
+            {error && <div className={styles.loginError}>{error}</div>}
 
             <button
-              className="login-submit"
+              className={styles.loginSubmit}
               type="submit"
               disabled={loading}
               style={{ marginTop: 8 }}

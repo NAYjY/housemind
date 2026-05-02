@@ -1,0 +1,121 @@
+.lp {
+  font-family: 'Sarabun', sans-serif;
+  background: #FBF8F3;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.lpInner { width: 100%; max-width: 430px; }
+
+.lpNav        { display: flex; justify-content: space-between; align-items: center; padding: 24px 24px 0; }
+.lpBrand      { font-family: 'DM Serif Display', serif; font-size: 19px; color: #1C1810; letter-spacing: -0.01em; }
+.lpBrand span { color: #B8860B; }
+.lpNavLogin {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1C1810;
+  background: #F0E8D8;
+  padding: 8px 16px;
+  border-radius: 100px;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  border: 1px solid #E0D0B0;
+}
+
+.lpHero { padding: 32px 24px 40px; }
+.lpBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FEF3DC;
+  color: #8B6010;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid #F0D890;
+  margin-bottom: 20px;
+  letter-spacing: 0.04em;
+}
+.lpBadgeDot { width: 6px; height: 6px; border-radius: 50%; background: #C49A3C; flex-shrink: 0; }
+.lpH1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 34px;
+  color: #1C1810;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.lpH1 em      { color: #B8860B; font-style: italic; }
+.lpH1En       { font-size: 12px; color: #B0A090; font-weight: 400; margin-bottom: 18px; font-family: 'DM Sans', sans-serif; }
+.lpSub        { font-size: 14px; color: #6B5D4E; line-height: 1.75; margin-bottom: 32px; }
+.lpSub strong { color: #1C1810; font-weight: 700; }
+.lpCtaRow     { display: flex; gap: 10px; align-items: center; }
+.lpBtnMain {
+  background: #1C1810;
+  color: #FBF8F3;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 14px 26px;
+  border-radius: 100px;
+  text-decoration: none;
+}
+.lpBtnDemo {
+  font-size: 13px;
+  color: #9A8870;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(154, 136, 112, 0.35);
+}
+
+.lpDivider { height: 1px; background: linear-gradient(90deg, transparent, #E0D4C0, transparent); margin: 0 24px; }
+
+.lpSection { padding: 36px 24px; }
+.lpKicker  { font-size: 10px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: #C49A3C; margin-bottom: 10px; }
+.lpH2      { font-family: 'DM Serif Display', serif; font-size: 22px; color: #1C1810; line-height: 1.32; margin-bottom: 8px; }
+.lpCap     { font-size: 13px; color: #9A8870; line-height: 1.65; margin-bottom: 24px; }
+
+.lpCards      { display: flex; flex-direction: column; gap: 10px; }
+.lpCard       { background: #fff; border: 1px solid #EDE5D8; border-radius: 14px; padding: 16px; display: flex; gap: 14px; align-items: flex-start; }
+.lpCardIcon   { width: 36px; height: 36px; border-radius: 10px; background: #FBF8F3; border: 1px solid #EDE5D8; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.lpCardNum    { width: 32px; height: 32px; border-radius: 10px; background: #FEF3DC; border: 1px solid #F0D890; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #8B6010; flex-shrink: 0; }
+.lpCardTitle  { font-size: 13px; font-weight: 700; color: #1C1810; margin-bottom: 4px; }
+.lpCardDesc   { font-size: 12px; color: #7A6B5C; line-height: 1.6; }
+.lpTagRed     { display: inline-block; font-size: 10px; font-weight: 600; color: #C05A30; background: #FEF0E8; padding: 2px 8px; border-radius: 100px; margin-top: 6px; border: 1px solid #FAD9C8; }
+.lpTagGreen   { display: inline-block; font-size: 10px; font-weight: 600; color: #3B6D11; background: #EAF3DE; padding: 2px 8px; border-radius: 100px; margin-top: 6px; border: 1px solid #C0DD97; }
+
+.lpRolesLabel { font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #B0A090; margin-bottom: 12px; }
+.lpRolesRow   { display: flex; gap: 8px; flex-wrap: wrap; }
+.lpRolePill   { font-size: 12px; font-weight: 500; padding: 7px 14px; border-radius: 100px; border: 1px solid #E0D8CC; color: #5C4E3E; background: #fff; }
+
+.lpFooterCta {
+  margin: 8px 24px 32px;
+  background: #fff;
+  border: 1px solid #EDE5D8;
+  border-radius: 20px;
+  padding: 28px 24px;
+  text-align: center;
+}
+.lpFooterEyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #C49A3C; margin-bottom: 10px; }
+.lpFooterH       { font-family: 'DM Serif Display', serif; font-size: 20px; color: #1C1810; line-height: 1.3; margin-bottom: 6px; }
+.lpFooterSub     { font-size: 12px; color: #9A8870; margin-bottom: 22px; line-height: 1.6; }
+.lpFooterBtn {
+  display: inline-block;
+  background: #1C1810;
+  color: #FBF8F3;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 15px 36px;
+  border-radius: 100px;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.lpBottomBar        { padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #EDE5D8; }
+.lpBottomBrand      { font-family: 'DM Serif Display', serif; font-size: 13px; color: #C8B898; }
+.lpBottomBrand span { color: #B8860B; }
+.lpBottomCopy       { font-size: 10px; color: #C8B898; letter-spacing: 0.04em; }
