@@ -134,15 +134,17 @@ def _presign_get(s3_key: str, expiry: int) -> str:
 
 def presign_product_thumbnail_upload(s3_key: str, content_type: str) -> str:
     if _IS_LOCAL():
-        public_host = _os.getenv("PUBLIC_HOST", "localhost")
-        return f"http://{public_host}:8000/api/v1/uploads/{s3_key}?_method=PUT"
+        public_host = _os.getenv("PUBLIC_HOST", "localhost:5000")
+        scheme = _os.getenv("PUBLIC_SCHEME", "http")
+        return f"{scheme}://{public_host}/api/v1/uploads/{s3_key}"
     return _presign_put(s3_key, content_type)
 
 
 def presign_project_image_upload(s3_key: str, content_type: str) -> str:
     if _IS_LOCAL():
-        public_host = _os.getenv("PUBLIC_HOST", "localhost")
-        return f"http://{public_host}:8000/api/v1/uploads/{s3_key}?_method=PUT"
+        public_host = _os.getenv("PUBLIC_HOST", "localhost:5000")
+        scheme = _os.getenv("PUBLIC_SCHEME", "http")
+        return f"{scheme}://{public_host}/api/v1/uploads/{s3_key}"
     return _presign_put(s3_key, content_type)
 
 

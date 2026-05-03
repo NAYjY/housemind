@@ -28,10 +28,15 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = cookies();
-  const locale = cookieStore.get("hm_locale")?.value ?? "th";
-  const supported = ["th", "en"];
-  const resolvedLocale = supported.includes(locale) ? locale : "th";
+  let resolvedLocale = "th";
+  try {
+    const cookieStore = cookies();
+    const locale = cookieStore.get("hm_locale")?.value ?? "th";
+    const supported = ["th", "en"];
+    resolvedLocale = supported.includes(locale) ? locale : "th";
+  } catch {
+    // cookies() unavailable during static rendering — default to "th"
+  }
 
   return (
     <html lang={resolvedLocale} className={`${notoSansThai.variable} ${notoSans.variable}`}>
