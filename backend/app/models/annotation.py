@@ -3,8 +3,7 @@ app/models/annotation.py — HouseMind
 Annotations pinned on project images.
 
 object_id (int 101-108) links annotation to a product category group.
-Multiple annotations across images sharing the same object_id show the
-same product list (filtered by project_id in object_products table).
+Resolution is now tracked in annotation_resolutions table (migration 010).
 """
 from __future__ import annotations
 
@@ -55,8 +54,6 @@ class Annotation(Base):
         nullable=True,
         index=True,
     )
-    # 101-108 maps to emoji category (sofa, floor, lamp etc)
-    # 0 = unknown / legacy
     object_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
 
     position_x: Mapped[float] = mapped_column(Float, nullable=False)
@@ -77,16 +74,8 @@ class Annotation(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
-    resolved_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        default=None,
-    )
 
+    # Relationships
     project_image: Mapped["ProjectImage"] = relationship(  # type: ignore[name-defined]
         "ProjectImage", back_populates="annotations"
     )
@@ -94,10 +83,6 @@ class Annotation(Base):
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
-
-    @property
-    def is_resolved(self) -> bool:
-        return self.resolved_at is not None
 
     def soft_delete(self) -> None:
         from datetime import timezone

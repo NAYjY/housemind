@@ -158,6 +158,18 @@ export async function authFetch(
     }
   }
 
+  // In local dev, if cookie auth fails, try refreshing the dev token
+  // This handles the case where the cookie expired but localStorage still has role/userId
+  if (res.status === 403 && _isLocal()) {
+    const body = await res.clone().json().catch(() => ({}));
+    if (body?.error_code === "ACCESS_DENIED" && body?.detail?.includes("not authenticated")) {
+      clearSession();
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/expired";
+      }
+    }
+  }
+
   return res;
 }
 

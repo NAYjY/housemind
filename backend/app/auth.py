@@ -271,12 +271,8 @@ async def require_annotation_project_member(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """
-    Used by GET /annotations?image_id=uuid — resolves project_id from the
-    image record, then checks project_members.  Avoids requiring a redundant
-    project_id param on the annotation list endpoint.
-    """
-    from app.models.project_image import ProjectImage  # local import avoids circular
+    from app.models.project_image import ProjectImage
+    from app.models.project import Project
 
     img_result = await db.execute(
         select(ProjectImage.project_id).where(
@@ -286,24 +282,40 @@ async def require_annotation_project_member(
     )
     row = img_result.first()
     if not row:
-        # Return empty list gracefully — do not reveal image existence
-        # The endpoint itself will query and return [].
         return user  # image not found; endpoint will return []
 
     project_id = row[0]
+
+    # Check direct membership first
     member_result = await db.execute(
         select(ProjectMember).where(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == uuid.UUID(user["user_id"]),
         )
     )
-    if not member_result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this project",
-            headers={"X-Error-Code": "ACCESS_DENIED"},
+    if member_result.scalar_one_or_none():
+        return user
+
+    # Check parent project membership (user invited to parent, accessing subproject)
+    proj_result = await db.execute(
+        select(Project.parent_project_id).where(Project.id == project_id)
+    )
+    proj_row = proj_result.first()
+    if proj_row and proj_row[0]:
+        parent_member_result = await db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == proj_row[0],
+                ProjectMember.user_id == uuid.UUID(user["user_id"]),
+            )
         )
-    return user
+        if parent_member_result.scalar_one_or_none():
+            return user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You are not a member of this project",
+        headers={"X-Error-Code": "ACCESS_DENIED"},
+    )
 
 
 # ── Project ownership check ────────────────────────────────────────────────────

@@ -23,12 +23,13 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
   const timerRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const startPos = useRef<Record<string, { x: number; y: number }>>({});
   const dragging = useRef<string | null>(null);
-
-  const getContainer = () =>
-    document.querySelector(`.${styles.canvasWrap}`) as HTMLDivElement | null;
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <>
+    <div
+      ref={containerRef}
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+    >
       {annotations.map((ann, i) => {
         const isActive = ann.id === activeId;
         const color = ann.resolution_state === "RESOLVED"
@@ -46,6 +47,7 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
               left: `${ann.position_x * 100}%`,
               top: `${ann.position_y * 100}%`,
               touchAction: "none",
+              pointerEvents: "auto",
             }}
             onPointerDown={(e) => {
               e.stopPropagation();
@@ -67,7 +69,7 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
                 e.preventDefault();
                 clearTimeout(timerRefs.current[ann.id]);
                 dragging.current = ann.id;
-                const container = getContainer();
+                const container = containerRef.current;
                 if (!container) return;
                 const rect = container.getBoundingClientRect();
                 const normX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -86,7 +88,7 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
                 : false;
               clearTimeout(timerRefs.current[ann.id]);
               if (wasDragging && moved) {
-                const container = getContainer();
+                const container = containerRef.current;
                 if (container) {
                   const rect = container.getBoundingClientRect();
                   const normX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -109,6 +111,6 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
           </div>
         );
       })}
-    </>
+    </div>
   );
 }

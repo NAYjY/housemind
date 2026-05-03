@@ -74,9 +74,10 @@ def _get_s3_client_cached():
 
 
 def _local_file_url(s3_key: str) -> str:
-    """Return a URL the browser can fetch for a local file."""
-    public_host = _os.getenv("PUBLIC_HOST", "localhost")
-    return f"http://{public_host}:8000/api/v1/uploads/{s3_key}"
+    """Return a URL the browser can fetch for a local file — always through nginx proxy."""
+    public_host = _os.getenv("PUBLIC_HOST", "localhost:5000")
+    scheme = _os.getenv("PUBLIC_SCHEME", "http")
+    return f"{scheme}://{public_host}/api/v1/uploads/{s3_key}"
 
 
 def _local_upload_path(s3_key: str) -> Path:

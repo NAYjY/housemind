@@ -274,6 +274,28 @@ async def create_invite(
         role=body.role,
     )
     db.add(member)
+    # Also add to all subprojects so the user can access workspace views
+    sub_result = await db.execute(
+        select(Project).where(
+            Project.parent_project_id == body.project_id,
+            Project.status != "archived",
+        )
+    )
+    for sub in sub_result.scalars().all():
+        existing_sub = await db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == sub.id,
+                ProjectMember.user_id == body.user_id,
+            )
+        )
+        if not existing_sub.scalar_one_or_none():
+            db.add(ProjectMember(
+                id=uuid.uuid4(),
+                project_id=sub.id,
+                user_id=body.user_id,
+                role=body.role,
+            ))
+
     await db.flush()
 
     return InviteCreateResponse(
