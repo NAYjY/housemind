@@ -36,6 +36,7 @@ import app.models.invite_request       # noqa: F401, E402
 import app.models.product              # noqa: F401, E402
 import app.models.object_product       # noqa: F401, E402
 import app.models.revoked_token        # noqa: F401, E402  ← new model
+import app.models.annotation_resolution   # noqa: F401, E402  ← new model
 
 target_metadata = Base.metadata
 

@@ -4,16 +4,30 @@ import { devtools } from "zustand/middleware";
 
 import type { ProductDetail } from "@/hooks/useProducts";
 
+export type ResolutionState = "OPEN" | "PARTIAL" | "RESOLVED";
+
+export interface AnnotationResolution {
+  id: string;
+  annotation_id: string;
+  user_id: string | null;
+  role: string;
+  resolved_at: string;
+  unresolved_at: string | null;
+  is_resolved: boolean;
+}
+
 export interface Annotation {
   id: string;
   image_id: string;
-  object_id: number;          // 101-108, links to product group
+  object_id: number;
   position_x: number;
   position_y: number;
   created_by: string | null;
   created_at: string;
-  resolved_at: string | null;
-  resolved_by: string | null;
+  // resolution
+  resolution_state: ResolutionState;
+  required_roles: string[];
+  resolutions: AnnotationResolution[];
 }
 
 

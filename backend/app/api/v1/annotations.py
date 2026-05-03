@@ -1,21 +1,5 @@
 """
 app/api/v1/annotations.py — HouseMind
-
-Security fixes applied:
-
-SEC-03  resolve / reopen now use require_annotation_project_member.
-        Previously they used require_architect_or_contractor with NO project
-        scope — any contractor could resolve annotations in any project they
-        had never been invited to.  The fix looks up the annotation's image
-        → project, then checks the caller is a project member.
-
-SEC-04  list_annotations now uses require_annotation_project_member
-        (resolves project_id from image_id automatically).
-
-SEC-14  Pagination added to list_annotations: limit (default 200, max 1000)
-        and offset query params.  Prevents unbounded responses on large projects.
-
-Previous IDOR fix (cross-project mutation) is preserved unchanged.
 """
 from __future__ import annotations
 
@@ -23,12 +7,13 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import (
     require_annotation_project_member,
-    require_architect_or_contractor,
     require_project_architect,
+    require_resolver,
 )
 from app.db.queries import (
     get_active_annotation,
@@ -39,19 +24,85 @@ from app.db.queries import (
 )
 from app.db.session import get_db
 from app.models.annotation import Annotation
+from app.models.annotation_resolution import AnnotationResolution
 from app.models.project_image import ProjectImage
 from app.models.project_member import ProjectMember
 from app.schemas.annotation import (
     AnnotationDetail,
+    AnnotationResolutionSchema,
     AnnotationSummary,
     AnnotationUpdateRequest,
     CreateAnnotationRequest,
-    ResolveAnnotationRequest,
 )
-from sqlalchemy import select
+
+router = APIRouter(prefix="/annotations", tags=["annotations"])
+
+# Roles that count toward resolution requirement
+_REQUIRED_ROLES = {"architect", "contractor", "homeowner"}
 
 
-def _to_summary(ann: Annotation) -> AnnotationSummary:
+# ── Resolution helpers ────────────────────────────────────────────────────────
+
+async def _get_required_roles(
+    db: AsyncSession,
+    project_id: uuid.UUID,
+) -> set[str]:
+    """Distinct roles in project_members for this project, excluding supplier."""
+    result = await db.execute(
+        select(ProjectMember.role)
+        .where(ProjectMember.project_id == project_id)
+        .distinct()
+    )
+    return {row[0] for row in result.fetchall()} & _REQUIRED_ROLES
+
+
+async def _get_resolutions(
+    db: AsyncSession,
+    annotation_id: uuid.UUID,
+) -> list[AnnotationResolution]:
+    result = await db.execute(
+        select(AnnotationResolution).where(
+            AnnotationResolution.annotation_id == annotation_id,
+        )
+    )
+    return list(result.scalars().all())
+
+
+def _compute_state(
+    resolutions: list[AnnotationResolution],
+    required_roles: set[str],
+) -> str:
+    resolved_roles = {
+        r.role for r in resolutions if r.is_resolved
+    }
+    if not resolved_roles:
+        return "OPEN"
+    if required_roles.issubset(resolved_roles):
+        return "RESOLVED"
+    return "PARTIAL"
+
+
+async def _get_project_id_for_annotation(
+    db: AsyncSession,
+    ann: Annotation,
+) -> uuid.UUID | None:
+    result = await db.execute(
+        select(ProjectImage.project_id).where(ProjectImage.id == ann.image_id)
+    )
+    row = result.first()
+    return row[0] if row else None
+
+
+async def _build_summary(
+    db: AsyncSession,
+    ann: Annotation,
+    project_id: uuid.UUID | None = None,
+) -> AnnotationSummary:
+    resolutions = await _get_resolutions(db, ann.id)
+    required_roles: set[str] = set()
+    if project_id:
+        required_roles = await _get_required_roles(db, project_id)
+
     return AnnotationSummary(
         id=ann.id,
         image_id=ann.image_id,
@@ -60,26 +111,47 @@ def _to_summary(ann: Annotation) -> AnnotationSummary:
         position_y=ann.position_y,
         created_by=ann.created_by,
         created_at=ann.created_at,
-        resolved_at=ann.resolved_at,
-        resolved_by=ann.resolved_by,
+        resolution_state=_compute_state(resolutions, required_roles),
+        required_roles=sorted(required_roles),
+        resolutions=[
+            AnnotationResolutionSchema(
+                id=r.id,
+                annotation_id=r.annotation_id,
+                user_id=r.user_id,
+                role=r.role,
+                resolved_at=r.resolved_at,
+                unresolved_at=r.unresolved_at,
+                is_resolved=r.is_resolved,
+            )
+            for r in resolutions
+        ],
     )
 
 
-router = APIRouter(prefix="/annotations", tags=["annotations"])
-
-
-# ── GET /annotations?image_id=<uuid> ─────────────────────────────────────────
+# ── GET /annotations?image_id= ────────────────────────────────────────────────
 
 @router.get("", response_model=list[AnnotationSummary])
 async def list_annotations(
     image_id: uuid.UUID = Query(...),
-    limit: int = Query(default=200, ge=1, le=1000),   # SEC-14: pagination
+    limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_annotation_project_member),  # SEC-04
+    _user: dict = Depends(require_annotation_project_member),
 ) -> list[AnnotationSummary]:
-    annotations = await list_active_annotations_for_image(db, image_id, limit=limit, offset=offset)
-    return [_to_summary(ann) for ann in annotations]
+    annotations = await list_active_annotations_for_image(
+        db, image_id, limit=limit, offset=offset
+    )
+
+    # Get project_id once from the image
+    project_id: uuid.UUID | None = None
+    if annotations:
+        img_result = await db.execute(
+            select(ProjectImage.project_id).where(ProjectImage.id == image_id)
+        )
+        row = img_result.first()
+        project_id = row[0] if row else None
+
+    return [await _build_summary(db, ann, project_id) for ann in annotations]
 
 
 # ── POST /annotations ─────────────────────────────────────────────────────────
@@ -110,10 +182,10 @@ async def create_annotation(
     )
     db.add(ann)
     await db.flush()
-    return _to_summary(ann)
+    return await _build_summary(db, ann, project_id)
 
 
-# ── PATCH /annotations/{annotation_id}/move ──────────────────────────────────
+# ── PATCH /annotations/{id}/move ─────────────────────────────────────────────
 
 @router.patch("/{annotation_id}/move", response_model=AnnotationSummary)
 async def move_annotation(
@@ -132,10 +204,10 @@ async def move_annotation(
     if body.position_y is not None:
         ann.position_y = body.position_y
     await db.flush()
-    return _to_summary(ann)
+    return await _build_summary(db, ann, project_id)
 
 
-# ── DELETE /annotations/{annotation_id} ──────────────────────────────────────
+# ── DELETE /annotations/{id} ──────────────────────────────────────────────────
 
 @router.delete("/{annotation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_annotation(
@@ -153,109 +225,88 @@ async def delete_annotation(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# ── PATCH /annotations/{annotation_id}/resolve ────────────────────────────────
+# ── POST /annotations/{id}/resolve ────────────────────────────────────────────
 
-@router.patch("/{annotation_id}/resolve", response_model=AnnotationDetail)
+@router.post("/{annotation_id}/resolve", response_model=AnnotationSummary)
 async def resolve_annotation(
     annotation_id: uuid.UUID,
-    body: ResolveAnnotationRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_architect_or_contractor),
-) -> AnnotationDetail:
-    """
-    SEC-03 fix: verify the caller is a member of the project that owns
-    this annotation before allowing the resolve.
-    """
+    user: dict = Depends(require_resolver),
+) -> AnnotationSummary:
     ann = await get_active_annotation(db, annotation_id)
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
-    if ann.resolved_at is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already resolved")
 
-    # SEC-03: check project membership via the annotation's image
-    await _require_annotation_membership(db, ann, user)
+    project_id = await _get_project_id_for_annotation(db, ann)
 
-    ann.resolved_at = datetime.now(timezone.utc)
-    ann.resolved_by = uuid.UUID(user["user_id"])
-    if body.note:
-        ann.note = body.note
+    # Verify caller is a member of this project
+    if project_id:
+        member_result = await db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == uuid.UUID(user["user_id"]),
+            )
+        )
+        if not member_result.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a project member")
+
+    now = datetime.now(timezone.utc)
+
+    # Upsert — one row per (annotation, user)
+    existing_result = await db.execute(
+        select(AnnotationResolution).where(
+            AnnotationResolution.annotation_id == annotation_id,
+            AnnotationResolution.user_id == uuid.UUID(user["user_id"]),
+        )
+    )
+    existing = existing_result.scalar_one_or_none()
+
+    if existing:
+        existing.resolved_at = now
+        existing.unresolved_at = None
+    else:
+        db.add(AnnotationResolution(
+            id=uuid.uuid4(),
+            annotation_id=annotation_id,
+            user_id=uuid.UUID(user["user_id"]),
+            role=user["role"],
+            resolved_at=now,
+            unresolved_at=None,
+        ))
+
     await db.flush()
+    return await _build_summary(db, ann, project_id)
 
-    return _to_detail(ann)
 
+# ── DELETE /annotations/{id}/resolve ─────────────────────────────────────────
 
-# ── PATCH /annotations/{annotation_id}/reopen ─────────────────────────────────
-
-@router.patch("/{annotation_id}/reopen", response_model=AnnotationDetail)
-async def reopen_annotation(
+@router.delete("/{annotation_id}/resolve", response_model=AnnotationSummary)
+async def unresolve_annotation(
     annotation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_architect_or_contractor),
-) -> AnnotationDetail:
-    """
-    SEC-03 fix: verify project membership before allowing reopen.
-    """
+    user: dict = Depends(require_resolver),
+) -> AnnotationSummary:
     ann = await get_active_annotation(db, annotation_id)
     if ann is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
-    if ann.resolved_at is None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not resolved")
 
-    # SEC-03: check project membership
-    await _require_annotation_membership(db, ann, user)
+    project_id = await _get_project_id_for_annotation(db, ann)
 
-    ann.resolved_at = None
-    ann.resolved_by = None
-    await db.flush()
-
-    return _to_detail(ann)
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-async def _require_annotation_membership(
-    db: AsyncSession,
-    ann: Annotation,
-    user: dict,
-) -> None:
-    """
-    SEC-03: Verify that `user` is a member of the project that owns `ann`.
-    Raises 403 if not.  Used by resolve and reopen endpoints.
-    """
-    img_result = await db.execute(
-        select(ProjectImage.project_id).where(ProjectImage.id == ann.image_id)
-    )
-    row = img_result.first()
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
-
-    project_id = row[0]
-    member_result = await db.execute(
-        select(ProjectMember).where(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == uuid.UUID(user["user_id"]),
+    # Find caller's own resolution row only
+    existing_result = await db.execute(
+        select(AnnotationResolution).where(
+            AnnotationResolution.annotation_id == annotation_id,
+            AnnotationResolution.user_id == uuid.UUID(user["user_id"]),
         )
     )
-    if not member_result.scalar_one_or_none():
+    existing = existing_result.scalar_one_or_none()
+
+    if not existing or not existing.is_resolved:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this project",
-            headers={"X-Error-Code": "ACCESS_DENIED"},
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have not resolved this annotation",
         )
 
-
-def _to_detail(ann: Annotation) -> AnnotationDetail:
-    return AnnotationDetail(
-        id=ann.id,
-        image_id=ann.image_id,
-        object_id=ann.object_id,
-        position_x=ann.position_x,
-        position_y=ann.position_y,
-        created_by=ann.created_by,
-        created_at=ann.created_at,
-        resolved_at=ann.resolved_at,
-        resolved_by=ann.resolved_by,
-        label=ann.label,
-        note=ann.note,
-        updated_at=ann.updated_at,
-    )
+    existing.unresolved_at = datetime.now(timezone.utc)
+    await db.flush()
+    return await _build_summary(db, ann, project_id)

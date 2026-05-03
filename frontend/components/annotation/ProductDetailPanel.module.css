@@ -20,7 +20,18 @@
 .pinName { font-size:13px; font-weight:500; color:#1A1A18; }
 .pinMeta { font-size:11px; color:#888; }
 .resolvedTag { color:#639922; margin-left:8px; }
-.reopenBtn { width:100%; height:44px; background:#F5F4F0; border:0.5px solid #E8E6E0; border-radius:12px; font-size:13px; font-weight:500; cursor:pointer; }
+
+/* Resolution sign-off list */
+.resolutionList { margin-bottom:12px; }
+.resolutionRow { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:0.5px solid #F5F4F0; font-size:12px; }
+.resolutionIcon { font-size:16px; color:#bbb; flex-shrink:0; }
+.resolutionIcon.done { color:#639922; }
+.resolutionRole { flex:1; color:#888; text-transform:capitalize; }
+.resolutionRole.done { color:#1A1A18; }
+.resolutionTime { font-size:10px; color:#888; flex-shrink:0; }
+
+/* Buttons */
+.reopenBtn { width:100%; height:44px; background:#F5F4F0; border:0.5px solid #E8E6E0; border-radius:12px; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; }
 .reopenBtn:disabled { opacity:0.5; }
-.resolveBtn { width:100%; height:44px; background:#EAF3DE; border:none; border-radius:12px; color:#3B6D11; font-size:13px; font-weight:500; cursor:pointer; }
+.resolveBtn { width:100%; height:44px; background:#EAF3DE; border:none; border-radius:12px; color:#3B6D11; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; }
 .resolveBtn:disabled { opacity:0.5; }

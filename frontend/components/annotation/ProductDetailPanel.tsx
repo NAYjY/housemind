@@ -2,7 +2,7 @@
 
 import { type Annotation } from "@/store/annotationStore";
 import { type ProductDetail } from "@/hooks/useProducts";
-import { useResolveAnnotation, useReopenAnnotation } from "@/hooks/useAnnotations";
+import { useResolveAnnotation, useUnresolveAnnotation } from "@/hooks/useAnnotations";
 import { OBJECT_DEFS } from "@/components/workspace/FanEmojiMenu";
 import styles from "./ProductDetailPanel.module.css";
 import closeBtnStyles from "@/components/shared/CloseBtn.module.css";
@@ -17,9 +17,9 @@ interface Props {
 
 export function ProductDetailPanel({ product, annotation, imageId, canResolve, onClose }: Props) {
   const resolveMutation = useResolveAnnotation(imageId);
-  const reopenMutation = useReopenAnnotation(imageId);
-  const isResolved = !!annotation?.resolved_at;
-  const isBusy = resolveMutation.isPending || reopenMutation.isPending;
+  const unresolveMutation = useUnresolveAnnotation(imageId);
+  const isBusy = resolveMutation.isPending || unresolveMutation.isPending;
+  const iAmResolved = annotation?.resolutions.some((r) => r.is_resolved) ?? false;
   const def = annotation ? OBJECT_DEFS[annotation.object_id] : null;
 
   return (
@@ -75,7 +75,9 @@ export function ProductDetailPanel({ product, annotation, imageId, canResolve, o
                 <div className={styles.pinName}>{def.label}</div>
                 <div className={styles.pinMeta}>
                   {Math.round(annotation.position_x * 100)}%, {Math.round(annotation.position_y * 100)}%
-                  {isResolved && <span className={styles.resolvedTag}>✓ Resolved</span>}
+                  {annotation.resolution_state === "RESOLVED" && (
+                    <span className={styles.resolvedTag}>✓ Resolved</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -84,13 +86,43 @@ export function ProductDetailPanel({ product, annotation, imageId, canResolve, o
 
         {canResolve && annotation && (
           <div>
-            {isResolved ? (
+            <div className={styles.resolutionList}>
+              {annotation.required_roles.map((role) => {
+                const roleResolutions = annotation.resolutions.filter(
+                  (r) => r.role === role && r.is_resolved
+                );
+                const done = roleResolutions.length > 0;
+                const latest = roleResolutions[0];
+                return (
+                  <div key={role} className={styles.resolutionRow}>
+                    <span className={`${styles.resolutionIcon}${done ? ` ${styles.done}` : ""}`}>
+                      {done ? "✓" : "○"}
+                    </span>
+                    <span className={`${styles.resolutionRole}${done ? ` ${styles.done}` : ""}`}>
+                      {role}
+                    </span>
+                    {done && latest && (
+                      <span className={styles.resolutionTime}>
+                        {new Date(latest.resolved_at).toLocaleString("th-TH", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {iAmResolved ? (
               <button
                 className={styles.reopenBtn}
-                onClick={() => reopenMutation.mutate(annotation.id)}
+                onClick={() => unresolveMutation.mutate(annotation.id)}
                 disabled={isBusy}
               >
-                {isBusy ? "Processing…" : "↩ Reopen"}
+                {isBusy ? "Processing…" : "↩ Un-resolve"}
               </button>
             ) : (
               <button

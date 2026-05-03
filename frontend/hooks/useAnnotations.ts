@@ -99,7 +99,7 @@ export function useResolveAnnotation(imageId: string) {
   return useMutation({
     mutationFn: async (annotationId: string) => {
       const res = await authFetch(`${API}/annotations/${annotationId}/resolve`, {
-        method: "PATCH",
+        method: "POST",
         body: JSON.stringify({}),
       });
       if (!res.ok) throw new Error("Failed to resolve");
@@ -109,18 +109,18 @@ export function useResolveAnnotation(imageId: string) {
   });
 }
 
-export function useReopenAnnotation(imageId: string) {
+export function useUnresolveAnnotation(imageId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (annotationId: string) => {
-      const res = await authFetch(`${API}/annotations/${annotationId}/reopen`, {
-        method: "PATCH",
-        body: JSON.stringify({}),
+      const res = await authFetch(`${API}/annotations/${annotationId}/resolve`, {
+        method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to reopen");
+      if (!res.ok) throw new Error("Failed to unresolve");
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["annotations", imageId] }),
   });
 }
+
 

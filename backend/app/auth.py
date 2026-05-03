@@ -182,7 +182,57 @@ def require_architect_or_contractor(user: dict = Depends(get_current_user)) -> d
         )
     return user
 
+# ── ADD this after require_architect_or_contractor ────────────────────────────
 
+def require_resolver(user: dict = Depends(get_current_user)) -> dict:
+    """
+    Roles that can resolve/unresolve annotations.
+    Supplier explicitly excluded — they are observers only.
+    """
+    if user["role"] not in {"architect", "contractor", "homeowner"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden — Supplier role cannot resolve annotations",
+            headers={"X-Error-Code": "ACCESS_DENIED"},
+        )
+    return user
+
+
+# ── RENAME throughout this file ───────────────────────────────────────────────
+# require_project_owner → require_project_architect
+# (the function body is identical, only the name changes)
+
+async def require_project_architect(
+    request: Request,
+    user: dict = Depends(require_architect),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    raw = (
+        request.path_params.get("project_id")
+        or request.query_params.get("project_id")
+    )
+    if not raw:
+        raise HTTPException(status_code=422, detail="project_id is required")
+    try:
+        project_id = uuid.UUID(str(raw))
+    except ValueError:
+        raise HTTPException(status_code=422, detail="project_id must be a valid UUID")
+
+    result = await db.execute(
+        select(Project).where(
+            Project.id == project_id,
+            Project.architect_id == uuid.UUID(user["user_id"]),
+            Project.status != "archived",
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this project, or the project does not exist",
+            headers={"X-Error-Code": "ACCESS_DENIED"},
+        )
+    return user
+    
 # ── SEC-04: real project membership check ─────────────────────────────────────
 
 async def require_project_member(

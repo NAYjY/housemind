@@ -6,7 +6,6 @@ import type { Annotation } from "@/store/annotationStore";
 import { OBJECT_DEFS } from "./FanEmojiMenu";
 import styles from "./PinsLayer.module.css";
 
-
 const PIN_COLORS = [
   "#7F77DD", "#C9A84C", "#639922", "#E24B4A",
   "#888780", "#534AB7", "#C05A30", "#3B6D11",
@@ -32,7 +31,11 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
     <>
       {annotations.map((ann, i) => {
         const isActive = ann.id === activeId;
-        const color = PIN_COLORS[i % PIN_COLORS.length];
+        const color = ann.resolution_state === "RESOLVED"
+          ? "#639922"
+          : ann.resolution_state === "PARTIAL"
+            ? "#C49A3C"
+            : PIN_COLORS[i % PIN_COLORS.length] ?? "#7F77DD";
         const def = OBJECT_DEFS[ann.object_id];
 
         return (
@@ -42,8 +45,6 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
             style={{
               left: `${ann.position_x * 100}%`,
               top: `${ann.position_y * 100}%`,
-              // Prevent the browser from hijacking vertical pointer movement
-              // for page scroll while the user is dragging a pin.
               touchAction: "none",
             }}
             onPointerDown={(e) => {
@@ -63,8 +64,6 @@ export function PinsLayer({ annotations, activeId, onSingleTap, onLongPress, onM
               const moved =
                 Math.abs(e.clientX - start.x) > 6 || Math.abs(e.clientY - start.y) > 6;
               if (moved) {
-                // Prevent page scroll while dragging — this is the key fix for
-                // up/down movement being swallowed by the browser scroll handler.
                 e.preventDefault();
                 clearTimeout(timerRefs.current[ann.id]);
                 dragging.current = ann.id;
