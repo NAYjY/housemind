@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, useCreateProject, type ProjectListItem, type ProjectDetail } from "@/hooks/useProjects";
@@ -148,7 +148,12 @@ export function ProfileClient() {
   const { data: projects = [], isLoading, error } = useProjects();
   const createProject = useCreateProject();
 
-  const [activeRole, setActiveRole] = useState<Role>((auth.role as Role) ?? "architect");
+  const [activeRole, setActiveRole] = useState<Role>("architect");
+
+  useEffect(() => {
+    if (auth.role) setActiveRole(auth.role as Role);
+  }, [auth.role]);
+  
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [inviteProject, setInviteProject] = useState<ProjectListItem | null>(null);
 

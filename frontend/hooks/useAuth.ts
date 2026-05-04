@@ -44,11 +44,9 @@ function buildState(
 }
 
 export function useAuth(): AuthState {
+  // Always start null — server and client must agree on initial render
   const [state, setState] = useState<AuthState>(() =>
-    {
-     if (typeof window !== "undefined") return buildState(getCurrentUser(), async () => {});
-     return buildState(null, async () => {});
-   }
+    buildState(null, async () => {})
   );
 
   useEffect(() => {
