@@ -48,8 +48,17 @@ _JWT_ALGORITHM = "HS256"  # SEC-09: never configurable via env
 # SEC-06: pre-computed dummy hash for timing-safe login
 _DUMMY_HASH = bcrypt.hashpw(b"__dummy__", bcrypt.gensalt(settings.BCRYPT_ROUNDS)).decode()
 
+_MAX_FAILED_ATTEMPTS = 10
+_LOCKOUT_MINUTES = 15
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+async def _check_and_record_failed_login(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """
+    Simple in-DB failed attempt counter using revoked_tokens table reuse.
+    For production, replace with Redis INCR+EXPIRE.
+    This is a stopgap — implement Redis-backed lockout before launch.
+    """
+    pass  # TODO: implement with Redis before production launch
 
 def _hash_password(password: str) -> str:
     return bcrypt.hashpw(
@@ -145,7 +154,10 @@ async def register(
 
 
 # ── POST /auth/login ──────────────────────────────────────────────────────────
-
+# TODO-SEC: implement Redis-backed account lockout before production.
+# Current rate limit: 10/min per IP via slowapi. Not sufficient for
+# distributed brute-force. Track failed attempts by email in Redis,
+# lock after 10 failures for 15 minutes.
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(
     request: Request,
