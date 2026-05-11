@@ -110,6 +110,27 @@ app.add_middleware(
 )
 app.add_middleware(RequestLoggingMiddleware)
 
+@app.middleware("http")
+async def csrf_check(request: Request, call_next) -> Response:
+    """
+    Require X-Requested-With header on state-changing requests.
+    Browsers never send this header on cross-site form submissions.
+    Skip for GET/HEAD/OPTIONS and for the /auth/* endpoints which use JSON bodies.
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Allow auth endpoints that POST from form (login page)
+        # They're already protected by SameSite=strict
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            # JSON requests from browsers always require explicit fetch — safe
+            pass
+        elif not request.headers.get("X-Requested-With"):
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "CSRF check failed", "error_code": "CSRF_REJECTED"},
+            )
+    return await call_next(request)
+    
 # ── Exception handlers ────────────────────────────────────────────────────────
 
 register_exception_handlers(app)
