@@ -22,8 +22,8 @@ export function useSlides({ initialImageId, initialImageUrl, dbImages }: UseSlid
   ]);
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // useState instead of useRef: participates in React's render cycle,
-  // so resetSeed() + a subsequent refetch re-runs the effect cleanly.
+  // Tracks whether DB images have seeded the slide list.
+  // Must be state (not ref) so changes trigger the useEffect below.
   const [dbSeeded, setDbSeeded] = useState(false);
 
   useEffect(() => {

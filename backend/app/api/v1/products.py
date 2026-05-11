@@ -39,7 +39,7 @@ import asyncio
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, require_architect, require_project_member, require_project_architect
@@ -174,9 +174,7 @@ async def search_products(
             )
         )
 
-    count_stmt = select(
-        __import__("sqlalchemy", fromlist=["func"]).func.count()
-    ).select_from(stmt.subquery())
+    count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
     stmt = stmt.offset(offset).limit(limit)
@@ -219,9 +217,7 @@ async def search_catalogue(
             )
         )
 
-    count_stmt = select(
-        __import__("sqlalchemy", fromlist=["func"]).func.count()
-    ).select_from(stmt.subquery())
+    count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
     stmt = stmt.order_by(Product.created_at.desc()).offset(offset).limit(limit)

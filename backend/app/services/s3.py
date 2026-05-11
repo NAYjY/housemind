@@ -34,7 +34,9 @@ _ALLOWED_EXTENSIONS = frozenset({
 _SAFE_EXT_RE = re.compile(r"^[a-z0-9]{1,10}$")
 
 _LOCAL_UPLOAD_DIR = Path("/app/uploads")
-_IS_LOCAL = lambda: _os.getenv("ENVIRONMENT", "local") in ("local", "test")
+
+def _IS_LOCAL() -> bool:
+    return _os.getenv("ENVIRONMENT", "local") in ("local", "test")
 
 def _validate_s3_key(key: str) -> None:
     """Reject keys that don't belong to a known prefix — prevents cross-tenant presign."""
