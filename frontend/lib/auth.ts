@@ -137,6 +137,9 @@ export async function authFetch(
     headers["Content-Type"] = "application/json";
   }
 
+  // CSRF: backend requires this on all state-changing requests (non-JSON bodies)
+  headers["X-Requested-With"] = "XMLHttpRequest";
+
   // Local dev Bearer fallback
   if (_isLocal()) {
     const devToken =
