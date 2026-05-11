@@ -92,6 +92,11 @@ def _local_upload_path(s3_key: str) -> Path:
 
 def presign_product_thumbnail(s3_key: str) -> str:
     if s3_key.startswith("http://") or s3_key.startswith("https://"):
+        try:
+            from app.services.ssrf_guard import validate_url_against_ssrf
+            validate_url_against_ssrf(s3_key, require_https=True)
+        except Exception:
+            return ""
         return s3_key
     if not s3_key:
         return ""

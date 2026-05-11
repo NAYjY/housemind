@@ -79,16 +79,7 @@ _MAX_SCRAPE_IMAGES = 20
 _SCRAPE_TIMEOUT = 8.0
 _SCRAPE_MAX_BYTES = 2 * 1024 * 1024  # SEC-16: 2 MB hard cap
 
-# SEC-25: trusted thumbnail URL patterns
-_TRUSTED_THUMBNAIL_RE = re.compile(
-    r"^https://"                            # https only
-    r"("
-    r"[a-z0-9\-]+\.s3\.[a-z0-9\-]+\.amazonaws\.com/"  # S3 virtual-hosted
-    r"|s3\.[a-z0-9\-]+\.amazonaws\.com/"              # S3 path-style
-    r"|[a-z0-9\-\.]+\.(jpg|jpeg|png|webp|gif|avif)$"  # direct image URL
-    r")",
-    re.IGNORECASE,
-)
+
 
 
 def _can_create_product(user: dict) -> bool:
@@ -118,9 +109,8 @@ async def _presign_product(p: Product) -> ProductDetail:
 def _validate_thumbnail_url(url: str) -> str:
     """
     SEC-25: reject external thumbnail URLs that don't look like images.
-    This prevents tracking pixel injection (attacker stores
-    https://attacker.com/pixel.gif?user=X as a product thumbnail).
-    Trusted patterns: S3 URLs or direct image file URLs (https only).
+    Strips query strings before extension check so pre-signed S3 URLs
+    and CDN URLs with query params are accepted.
     """
     if not url:
         return url
@@ -129,17 +119,18 @@ def _validate_thumbnail_url(url: str) -> str:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Thumbnail URL must use https://",
         )
-    if not _TRUSTED_THUMBNAIL_RE.match(url):
-        # Check if it ends with a known image extension as fallback
-        lower = url.lower().split("?")[0]  # strip query string
-        if not any(lower.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif")):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Thumbnail URL must point to an image file (jpg, png, webp, gif, avif) "
-                    "or an S3 bucket URL."
-                ),
-            )
+    # Strip query string and fragment before checking extension/host
+    path_only = url.lower().split("?")[0].split("#")[0]
+    is_image_ext = any(path_only.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"))
+    is_s3 = "amazonaws.com" in path_only
+    if not is_image_ext and not is_s3:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Thumbnail URL must point to an image file (jpg, png, webp, gif, avif) "
+                "or an S3 bucket URL."
+            ),
+        )
     return url
 
 
