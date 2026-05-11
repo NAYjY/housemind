@@ -155,6 +155,7 @@ export async function authFetch(
     clearSession();
     if (typeof window !== "undefined") {
       window.location.href = "/auth/expired";
+      throw new Error("Session expired");
     }
   }
 
