@@ -82,7 +82,7 @@ def _issue_token(user: User) -> tuple[str, str, datetime]:
 
 def _set_auth_cookie(response: Response, token: str) -> None:
     """SEC-13: httpOnly cookie, secure outside local/test."""
-    is_secure = settings.ENVIRONMENT not in ("local", "test")
+    is_secure = settings.ENVIRONMENT in ("staging", "production")
     response.set_cookie(
         key="hm_token",
         value=token,
