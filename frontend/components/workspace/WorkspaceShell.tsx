@@ -93,7 +93,6 @@ export function WorkspaceShell({ imageId, imageUrl, projectId, forceReadOnly }: 
 
       {state.pickerOpen && (
         <ProductPickerModal
-          projectId={projectId}
           onSelect={async (productId) => {
             await linkProduct.mutateAsync({ productId, objectId: activeAnnotation?.object_id ?? 0 });
             state.setPickerOpen(false);

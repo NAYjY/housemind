@@ -6,15 +6,14 @@ import styles from "./ProductPickerModal.module.css";
 import closeBtnStyles from "@/components/shared/CloseBtn.module.css";
 
 interface Props {
-  projectId: string;
   onSelect: (productId: string) => void;
   onClose: () => void;
 }
 
-export function ProductPickerModal({ projectId, onSelect, onClose }: Props) {
+export function ProductPickerModal({ onSelect, onClose }: Props) {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
-  const { data, isLoading } = useProductSearch(q, projectId);
+  const { data, isLoading } = useProductSearch(q);
   const products = data?.items ?? [];
 
   return (

@@ -2,11 +2,9 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
-import type { ProductDetail } from "@/hooks/useProducts";
+type ResolutionState = "OPEN" | "PARTIAL" | "RESOLVED";
 
-export type ResolutionState = "OPEN" | "PARTIAL" | "RESOLVED";
-
-export interface AnnotationResolution {
+interface AnnotationResolution {
   id: string;
   annotation_id: string;
   user_id: string | null;
@@ -35,14 +33,14 @@ export interface Annotation {
 interface AnnotationState {
   annotationsByImage: Record<string, Annotation[]>;
   activePinId: string | null;
-  productDetails: Record<string, ProductDetail>;
+  
 
   setAnnotations: (imageId: string, annotations: Annotation[]) => void;
   addAnnotation: (annotation: Annotation) => void;
   updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
   deleteAnnotation: (id: string, imageId: string) => void;
   setActivePin: (id: string | null) => void;
-  cacheProductDetail: (productId: string, detail: ProductDetail) => void;
+  
 }
 
 export const useAnnotationStore = create<AnnotationState>()(
@@ -50,7 +48,7 @@ export const useAnnotationStore = create<AnnotationState>()(
     (set) => ({
       annotationsByImage: {},
       activePinId: null,
-      productDetails: {},
+      
 
       setAnnotations: (imageId, annotations) =>
         set((state) => ({
@@ -88,10 +86,7 @@ export const useAnnotationStore = create<AnnotationState>()(
 
       setActivePin: (id) => set({ activePinId: id }, false, "setActivePin"),
 
-      cacheProductDetail: (productId, detail) =>
-        set((state) => ({
-          productDetails: { ...state.productDetails, [productId]: detail },
-        }), false, "cacheProductDetail"),
+      
     }),
     { name: "HouseMind:Annotations" }
   )

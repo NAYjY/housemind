@@ -3,7 +3,7 @@
 
 import type { Annotation } from "@/store/annotationStore";
 import type { ProductDetail } from "@/hooks/useProducts";
-import { useProjectProducts, useUnlinkProduct, useUnlinkProductByProductId } from "@/hooks/useProducts";
+import { useProjectProducts, useUnlinkProductByProductId } from "@/hooks/useProducts";
 import { OBJECT_DEFS } from "./FanEmojiMenu";
 import { useState } from "react";
 import styles from "./ProductGrid.module.css";

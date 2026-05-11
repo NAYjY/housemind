@@ -56,7 +56,7 @@ export function useProjectProducts(projectId: string, objectId?: number | null) 
 }
 
 // Search products — searches GLOBAL catalogue for the picker modal
-export function useProductSearch(q: string, projectId?: string) {
+export function useProductSearch(q: string) {
   return useQuery<{ items: ProductDetail[]; total: number }>({
     queryKey: ["products", "catalogue", q],
     queryFn: async () => {
@@ -144,24 +144,6 @@ export function useLinkProduct(projectId: string) {
   });
 }
 
-// useUnlinkProduct — FIX: same issue, project_id must be a query param
-export function useUnlinkProduct(projectId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (objectProductId: string) => {
-      // ✅ project_id in query string (required by require_project_architect)
-      const res = await authFetch(
-        `${API}/products/link/${objectProductId}?project_id=${projectId}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("Failed to unlink product");
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["products", "project", projectId] });
-    },
-  });
-}
-
 export function useProductDetail(productId: string | null) {
   return useQuery({
     queryKey: ["product", productId],
@@ -191,22 +173,7 @@ export function useDeleteProduct() {
   });
 }
 
-/** DELETE /products/link/{objectProductId} scoped to project — unlink from annotation */
-export function useUnlinkProductFromAnnotation(projectId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ objectProductId }: { objectProductId: string }) => {
-      const res = await authFetch(
-        `${API}/products/link/${objectProductId}?project_id=${projectId}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("Failed to unlink product");
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["products", "project", projectId] });
-    },
-  });
-}
+
 
 /** DELETE /products/link-by-product — unlink by product+object+project */
 export function useUnlinkProductByProductId(projectId: string) {
