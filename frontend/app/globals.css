@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600;700&display=swap');
+
 /* ==========================================================================
    app/globals.css — HouseMind
    ONLY: fonts, reset, tokens, base elements, global utilities.
@@ -5,7 +7,6 @@
    ========================================================================== */
 
 /* 1. Fonts */
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600;700&display=swap');
 
 /* 2. Reset */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
