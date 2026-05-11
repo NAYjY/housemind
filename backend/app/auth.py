@@ -237,7 +237,10 @@ async def require_annotation_project_member(
     )
     row = img_result.first()
     if not row:
-        return user  # image not found; endpoint will return []
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
 
     project_id = row[0]
 
