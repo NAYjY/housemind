@@ -51,7 +51,10 @@ export function storeSession(data: {
   localStorage.setItem(ROLE_KEY, data.role);
   localStorage.setItem(USER_ID_KEY, data.user_id);
   if (_isLocal()) {
-    localStorage.setItem(DEV_TOKEN_KEY, data.access_token);
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_APP_ENV === "local" &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   }
 }
 
