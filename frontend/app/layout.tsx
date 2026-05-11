@@ -30,7 +30,7 @@ export default async function RootLayout({
 }) {
   let resolvedLocale = "th";
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const locale = cookieStore.get("hm_locale")?.value ?? "th";
     const supported = ["th", "en"];
     resolvedLocale = supported.includes(locale) ? locale : "th";

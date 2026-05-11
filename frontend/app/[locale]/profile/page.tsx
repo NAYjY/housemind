@@ -11,7 +11,7 @@ import { ProfileClient } from "./ProfileClient";
 export default async function ProfilePage() {
   // Read the httpOnly JWT cookie server-side for the internal API call.
   // This is safe — we never expose the token to the client HTML.
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get("hm_token")?.value;
 
   const { dehydratedState } = await prefetchProjects(token);

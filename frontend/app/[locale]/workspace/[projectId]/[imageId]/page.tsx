@@ -25,7 +25,7 @@ export default async function WorkspacePage({ params, searchParams }: Props) {
   const imageUrl = sp.src ?? "/placeholder-room.jpg";
   const forceReadOnly = sp.readOnly === "true";
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get("hm_token")?.value;
 
   const { dehydratedState } = await prefetchWorkspace(projectId, imageId, token);
