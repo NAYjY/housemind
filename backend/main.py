@@ -25,19 +25,21 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-try:
-    from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.errors import RateLimitExceeded
-    from slowapi.util import get_remote_address
-    _SLOWAPI_AVAILABLE = True
-except ImportError:
-    _SLOWAPI_AVAILABLE = False
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
 
 from app.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import RequestLoggingMiddleware, configure_logging, get_logger
 from app.core.sentry import init_sentry
 from app.db.session import check_db_connection
+
+
+from app.api.v1.auth import login, register
+from app.api.v1 import router as v1_router  # noqa: E402
 
 logger = get_logger(__name__)
 _start_time = time.time()
@@ -71,16 +73,11 @@ app = FastAPI(
 
 # ── SEC-05: rate limiter ──────────────────────────────────────────────────────
 
-if _SLOWAPI_AVAILABLE:
-    limiter = Limiter(key_func=get_remote_address)
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    logger.info("rate_limiter.enabled")
-else:
-    logger.warning(
-        "rate_limiter.disabled",
-        reason="slowapi not installed — add slowapi to requirements.txt",
-    )
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 
 # ── SEC-15: request body size limit ──────────────────────────────────────────
@@ -117,16 +114,12 @@ register_exception_handlers(app)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from app.api.v1 import router as v1_router  # noqa: E402
-
 app.include_router(v1_router, prefix="/api/v1")
 
 # ── Rate limit decorators (applied here so limiter is available) ──────────────
 
-if _SLOWAPI_AVAILABLE:
-    from app.api.v1.auth import login, register
-    limiter.limit("10/minute")(login)
-    limiter.limit("5/minute")(register)
+limiter.limit("10/minute")(login)
+limiter.limit("5/minute")(register)
 
 
 # ── Health endpoints ──────────────────────────────────────────────────────────
