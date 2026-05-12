@@ -172,10 +172,22 @@ async def readiness(
     Configure UptimeRobot to send the header; leave HEALTH_SECRET empty in
     local dev to disable the check.
     """
-    if settings.HEALTH_SECRET and x_health_secret != settings.HEALTH_SECRET:
+    if settings.ENVIRONMENT in ("staging", "production"):
+        if not settings.HEALTH_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Health secret not configured",
+            )
+        if x_health_secret != settings.HEALTH_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="X-Health-Secret required",
+            )
+    elif settings.HEALTH_SECRET and x_health_secret != settings.HEALTH_SECRET:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="X-Health-Secret required",
         )
+
     await check_db_connection()
     return {"status": "ready"}
