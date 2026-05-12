@@ -50,3 +50,16 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email} role={self.role}>"
+        
+    def __str__(self) -> str:
+        return f"User(id={self.id}, email={self.email}, role={self.role})"
+    
+    # Prevent accidental serialization of sensitive fields
+    def model_dump_safe(self) -> dict:
+        return {
+            "id": str(self.id),
+            "email": self.email,
+            "full_name": self.full_name,
+            "role": self.role,
+            "is_active": self.is_active,
+        }
