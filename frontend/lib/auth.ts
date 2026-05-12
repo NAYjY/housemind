@@ -94,6 +94,26 @@ export function getCurrentUser(): TokenPayload | null {
   const role = getStoredRole();
   const user_id = getStoredUserId();
   if (!role || !user_id) return null;
+  
+  // In local dev, decode exp from stored token
+  if (_isLocal()) {
+    const devToken = localStorage.getItem(DEV_TOKEN_KEY);
+    if (devToken) {
+      try {
+        const parts = devToken.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]!));
+          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+            clearSession();
+            return null;
+          }
+        }
+      } catch {
+        // ignore decode errors
+      }
+    }
+  }
+  
   return {
     sub: user_id,
     user_id,
