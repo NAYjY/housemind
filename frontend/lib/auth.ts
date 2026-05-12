@@ -25,6 +25,8 @@ const DEV_TOKEN_KEY = "hm_dev_token";
 const _isLocal = () =>
   typeof process !== "undefined" &&
   process.env.NEXT_PUBLIC_APP_ENV === "local";
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
 export interface TokenPayload {
   sub: string;
