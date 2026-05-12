@@ -99,7 +99,7 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="อย่างน้อย 8 ตัว, มีตัวพิมพ์ใหญ่+เล็ก+ตัวเลข"
-              autoComplete="new-password"
+              autoComplete="off"
               required
             />
 
@@ -110,7 +110,7 @@ export default function RegisterPage() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="••••••••"
-              autoComplete="new-password"
+              autoComplete="off"
               required
             />
 
