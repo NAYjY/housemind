@@ -15,6 +15,10 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 _UPLOAD_DIR = Path("/app/uploads")
 
+_ALLOWED_CONTENT_TYPES = frozenset({
+    "image/jpeg", "image/png", "image/webp", "image/gif",
+    "image/avif", "image/heic", "image/heif",
+})
 
 def _safe_path(s3_key: str) -> Path:
     """Resolve path and ensure it stays within _UPLOAD_DIR."""
@@ -28,6 +32,12 @@ def _safe_path(s3_key: str) -> Path:
 async def upload_file(s3_key: str, request: Request) -> Response:
     if os.getenv("ENVIRONMENT", "local") not in ("local", "test"):
         raise HTTPException(status_code=404)
+    path = _safe_path(s3_key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = await request.body()
+    content_type = request.headers.get("Content-Type")
+    if content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Unsupported media type")
     path = _safe_path(s3_key)
     path.parent.mkdir(parents=True, exist_ok=True)
     body = await request.body()
