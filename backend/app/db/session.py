@@ -19,8 +19,16 @@ from app.config import settings
 
 _is_test = settings.ENVIRONMENT in ("local", "test")
 
+def _normalize_db_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _normalize_db_url(settings.DATABASE_URL),
     echo=_is_test,
     future=True,
     pool_size=5,
