@@ -15,6 +15,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -72,6 +73,21 @@ class Settings(BaseSettings):
     # ── Logging ───────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
 
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        if self.ENVIRONMENT in ("staging", "production"):
+            problems = []
+            if len(self.SECRET_KEY) < 32:
+                problems.append("SECRET_KEY must be set to a strong random value (min 32 chars)")
+            if self.CORS_ORIGINS == "http://localhost:3000":
+                problems.append("CORS_ORIGINS still set to localhost default")
+            if not self.HEALTH_SECRET:
+                problems.append("HEALTH_SECRET must be set (readiness probe would be publicly reachable)")
+            if problems:
+                raise ValueError(
+                    f"Refusing to start in {self.ENVIRONMENT}: " + "; ".join(problems)
+                )
+        return self
 
 @lru_cache
 def get_settings() -> Settings:
