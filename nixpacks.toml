@@ -16,4 +16,4 @@ cmds = ["pip install --break-system-packages -r backend/requirements.txt"]
 [start]
 # 1. alembic upgrade head  — applies all pending migrations atomically
 # 2. uvicorn               — starts the FastAPI server only after migrations succeed
-cmd = "cd backend && alembic -c ../db/alembic.ini upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "cd backend && python -m alembic -c ../db/alembic.ini upgrade head && python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
