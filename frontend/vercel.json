@@ -54,7 +54,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.s3.ap-southeast-1.amazonaws.com https://s3.ap-southeast-1.amazonaws.com https://images.unsplash.com; connect-src 'self' https://api.housemind.app https://o*.ingest.sentry.io; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.s3.ap-southeast-1.amazonaws.com https://s3.ap-southeast-1.amazonaws.com https://images.unsplash.com; connect-src 'self' https://housemind-production.up.railway.app https://o*.ingest.sentry.io; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         }
       ]
     },
@@ -80,7 +80,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://api.housemind.app/v1/:path*"
+      "destination": "https://housemind-production.up.railway.app/api/v1/:path*"
     }
   ],
   "redirects": [
