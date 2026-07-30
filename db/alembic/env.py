@@ -47,6 +47,8 @@ def get_url() -> str:
         raise RuntimeError("DATABASE_URL is not set.")
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
 
 
