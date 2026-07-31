@@ -25,12 +25,13 @@ export function useImageUpload({ projectId, isAuthenticated, onSuccess }: UseIma
       setUploading(true);
       setUploadError("");
       try {
+        const contentType = file.type || "image/jpeg";
         const presignRes = await authFetch(`${API}/images/upload-url?project_id=${projectId}`, {
           method: "POST",
           body: JSON.stringify({
             project_id: projectId,
             filename: file.name,
-            content_type: file.type,
+            content_type: contentType,
           }),
         });
         if (!presignRes.ok) throw new Error("Could not get upload URL");
@@ -39,7 +40,7 @@ export function useImageUpload({ projectId, isAuthenticated, onSuccess }: UseIma
         const s3Res = await fetch(upload_url, {
           method: "PUT",
           body: file,
-          headers: { "Content-Type": file.type },
+          headers: { "Content-Type": contentType },
         });
         if (!s3Res.ok) throw new Error("S3 upload failed");
 
