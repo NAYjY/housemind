@@ -60,17 +60,18 @@ def _get_s3_client():
         region_name=settings.AWS_DEFAULT_REGION,
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        config=_BotoConfig(signature_version="s3v4"),
+        config=_BotoConfig(
+            signature_version="s3v4",
+            # Virtual-hosted-style (bucket.s3.region.amazonaws.com) —
+            # S3's CORS preflight handling is unreliable with path-style
+            # URLs (s3.region.amazonaws.com/bucket/...), which caused
+            # CORS preflight to fail despite correct bucket CORS config.
+            s3={"addressing_style": "virtual"},
+        ),
     )
     endpoint_url = _os.getenv("AWS_ENDPOINT_URL")
     if endpoint_url:
         kwargs["endpoint_url"] = endpoint_url
-    elif not _IS_LOCAL():
-        # Force the regional endpoint explicitly — the global
-        # s3.amazonaws.com endpoint issues a 307 redirect for
-        # buckets outside us-east-1, and redirects don't carry
-        # CORS headers, breaking browser preflight requests.
-        kwargs["endpoint_url"] = f"https://s3.{settings.AWS_DEFAULT_REGION}.amazonaws.com"
     return boto3.client("s3", **kwargs)
 
 
