@@ -54,10 +54,13 @@ def _sanitize_extension(raw_ext: str) -> str:
 
 
 def _get_s3_client():
+    from botocore.config import Config as _BotoConfig
+
     kwargs: dict = dict(
         region_name=settings.AWS_DEFAULT_REGION,
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        config=_BotoConfig(signature_version="s3v4"),
     )
     endpoint_url = _os.getenv("AWS_ENDPOINT_URL")
     if endpoint_url:
