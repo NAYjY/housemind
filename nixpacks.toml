@@ -9,7 +9,7 @@
 #   PORT           — injected automatically by Railway
 
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "stdenv.cc.cc.lib"]
+nixPkgs = ["stdenv.cc.cc.lib", "python311Packages.pip", "python311"]
 
 [phases.install]
 cmds = ["pip install --break-system-packages -r backend/requirements.txt"]
